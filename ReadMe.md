@@ -8,7 +8,7 @@
         (3) 劫隔一手  
         (4) 数子法判定输赢  
 * 关键程序API：  
-## [MCTS]核心函数  
+### [MCTS]核心函数  
 ```
 	MCTSNode* MCTS(MCTSNode* node);									//[MCTS]蒙特卡洛树搜索  
 	MCTSNode* Select(MCTSNode* node, bool isExploration);			//[1]选择最优节点  
@@ -20,7 +20,7 @@
 	MCTSNode* TreePolicy(MCTSNode* node);							//  
 	bool nextStateRand(CHESS* map, INT8S& x0, INT8S& y0, CHESS chess);//随机走子  
 ```
-## 围棋规则函数  
+### 围棋规则函数  
 ```
 	bool downChess(CHESS* map, INT8S x0, INT8S y0, CHESS chess);	//[RULE 1]:无气提子//落子
 	void judgeNotPoint(CHESS* map, CHESS chess);					//[RULE 2]:非提禁入
@@ -29,18 +29,18 @@
 	void GoAI(CHESS* map, INT8S player, INT8S& x0, INT8S& y0);  
 ```
   
-# 日志  
-##  
+## 日志  
+###  
 随机落子至满盘，  
 9x9平均可落120手  
 19x19平均可落500手  
   
-##  
+###  
 围棋输赢判断规则不具完备性，需要对弈双方主观确认，"双活"在程序设计里是个巨坑....  
 理应围棋下到不能下为止，但为了节省时间，才出现了死棋就不再下，胜率不高就投子认输的方法。  
 但这就对编程，产生了极大的考验  
 
-## 
+### 
 【蒙特卡洛树搜索 · 9格】 五子棋测试。成功了。
 1.蒙特卡洛的问题，
 在于19格无法实现"频率估计概率"，
@@ -48,7 +48,7 @@
 2.将五子棋的判赢函数，改成围棋，
 即实现9子围棋AI，下一步目标。
 
-##  
+###  
 通过[任务管理器]监测内存。
 Okey，蒙特卡洛树，内存实时释放成功。
 注.
