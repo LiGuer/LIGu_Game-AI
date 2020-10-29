@@ -10,15 +10,15 @@
 * 关键程序API：  
 ## [MCTS]核心函数  
 '''  
-	MCTSNode* MCTS(MCTSNode* node);									//[MCTS]蒙特卡洛树搜索
-	MCTSNode* Select(MCTSNode* node, bool isExploration);			//[1]选择最优节点
-	MCTSNode* Expand(MCTSNode* node);								//[2]拓展新节点
-	int Simulation(State* state0);									//[3]模拟,快速走子
+	MCTSNode* MCTS(MCTSNode* node);									//[MCTS]蒙特卡洛树搜索  
+	MCTSNode* Select(MCTSNode* node, bool isExploration);			//[1]选择最优节点  
+	MCTSNode* Expand(MCTSNode* node);								//[2]拓展新节点  
+	int Simulation(State* state0);									//[3]模拟,快速走子  
 	void Backpropagation(MCTSNode* node, int reward);				//[4]回溯  
       
-    double UCB(MCTSNode* node, double C);							//UCB公式
-	MCTSNode* TreePolicy(MCTSNode* node);							//
-	bool nextStateRand(CHESS* map, INT8S& x0, INT8S& y0, CHESS chess);//随机走子
+    double UCB(MCTSNode* node, double C);							//UCB公式  
+	MCTSNode* TreePolicy(MCTSNode* node);							//  
+	bool nextStateRand(CHESS* map, INT8S& x0, INT8S& y0, CHESS chess);//随机走子  
 '''  
 ## 围棋规则函数  
 '''  
@@ -26,19 +26,19 @@
 	void judgeNotPoint(CHESS* map, CHESS chess);					//[RULE 2]:非提禁入
 	int judgeWin(CHESS* map);										//[RULE 4]:局势判定(数子法)
 	void ComputerQi(CHESS* map, INT8U qi[], INT8U chBlockMap[]);	//棋块数气
-	void GoAI(CHESS* map, INT8S player, INT8S& x0, INT8S& y0);
+	void GoAI(CHESS* map, INT8S player, INT8S& x0, INT8S& y0);  
 '''  
   
 # 日志  
 ##  
 随机落子至满盘，  
 9x9平均可落120手  
-19x19平均可落500手
-
-##
-围棋输赢判断规则不具完备性，需要对弈双方主观确认，"双活"在程序设计里是个巨坑....
-理应围棋下到不能下为止，但为了节省时间，才出现了死棋就不再下，胜率不高就投子认输的方法。
-但这就对编程，产生了极大的考验
+19x19平均可落500手  
+  
+##  
+围棋输赢判断规则不具完备性，需要对弈双方主观确认，"双活"在程序设计里是个巨坑....  
+理应围棋下到不能下为止，但为了节省时间，才出现了死棋就不再下，胜率不高就投子认输的方法。  
+但这就对编程，产生了极大的考验  
 
 ## 
 【蒙特卡洛树搜索 · 9格】 五子棋测试。成功了。
