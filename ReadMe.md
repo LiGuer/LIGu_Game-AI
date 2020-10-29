@@ -9,7 +9,7 @@
         (4) 数子法判定输赢  
 * 关键程序API：  
 ## [MCTS]核心函数  
-'''  
+```
 	MCTSNode* MCTS(MCTSNode* node);									//[MCTS]蒙特卡洛树搜索  
 	MCTSNode* Select(MCTSNode* node, bool isExploration);			//[1]选择最优节点  
 	MCTSNode* Expand(MCTSNode* node);								//[2]拓展新节点  
@@ -19,15 +19,15 @@
     double UCB(MCTSNode* node, double C);							//UCB公式  
 	MCTSNode* TreePolicy(MCTSNode* node);							//  
 	bool nextStateRand(CHESS* map, INT8S& x0, INT8S& y0, CHESS chess);//随机走子  
-'''  
+```
 ## 围棋规则函数  
-'''  
+```
 	bool downChess(CHESS* map, INT8S x0, INT8S y0, CHESS chess);	//[RULE 1]:无气提子//落子
 	void judgeNotPoint(CHESS* map, CHESS chess);					//[RULE 2]:非提禁入
 	int judgeWin(CHESS* map);										//[RULE 4]:局势判定(数子法)
 	void ComputerQi(CHESS* map, INT8U qi[], INT8U chBlockMap[]);	//棋块数气
 	void GoAI(CHESS* map, INT8S player, INT8S& x0, INT8S& y0);  
-'''  
+```
   
 # 日志  
 ##  
