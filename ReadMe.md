@@ -12,21 +12,21 @@
 ```
 	MCTSNode* MCTS(MCTSNode* node);									//[MCTS]蒙特卡洛树搜索  
 	MCTSNode* Select(MCTSNode* node, bool isExploration);			//[1]选择最优节点  
-	MCTSNode* Expand(MCTSNode* node);								//[2]拓展新节点  
+	bool Expand(MCTSNode* node, MCTSNode** newnode);								//[2]拓展新节点  
 	int Simulation(State* state0);									//[3]模拟,快速走子  
 	void Backpropagation(MCTSNode* node, int reward);				//[4]回溯  
-      
-    double UCB(MCTSNode* node, double C);							//UCB公式  
+	double UCB(MCTSNode* node, double C);							//UCB公式  
 	MCTSNode* TreePolicy(MCTSNode* node);							//  
-	bool nextStateRand(CHESS* map, INT8S& x0, INT8S& y0, CHESS chess);//随机走子  
+	bool nextStateRand(State* state);//随机走子  
 ```
 ### 围棋规则函数  
 ```
-	bool downChess(CHESS* map, INT8S x0, INT8S y0, CHESS chess);	//[RULE 1]:无气提子//落子
-	void judgeNotPoint(CHESS* map, CHESS chess);					//[RULE 2]:非提禁入
-	int judgeWin(CHESS* map);										//[RULE 4]:局势判定(数子法)
-	void ComputerQi(CHESS* map, INT8U qi[], INT8U chBlockMap[]);	//棋块数气
-	void GoAI(CHESS* map, INT8S player, INT8S& x0, INT8S& y0);  
+	bool downStone(STONE* map, INT8S x0, INT8S y0, STONE stone);	//[RULE 1]:无气提子 //落子  
+	void ComputerQi(STONE* map, INT8U qi[], INT8U chBlockMap[]);	//棋块数气  
+	void judgeNotPoint(STONE* map, STONE stone, INT8U qi[], INT8U chBlockMap[]);//[RULE 2]:非提禁入 //一方禁入点标记  
+	bool judgeJie(STONE* map, STONE stone, INT8S x0, INT8S y0,INT8U qi[], INT8U chBlockMap[], INT8S Jie0[]);	//[RULE 3]:劫停一手//判定劫  
+	void judgeEye(STONE* map, INT8U qi[], INT8U chBlockMap[]);  
+	int judgeWin(STONE* map);										//[RULE 4]:局势判定(数子法)  
 ```
   
 ## 日志  
