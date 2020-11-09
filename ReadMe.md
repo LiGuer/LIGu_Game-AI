@@ -46,6 +46,7 @@ The AI of [Go],[GoBang] named "Daiyu黛玉".
   
 ## Image
 ![Image text](https://github.com/LiGuer/Daiyu-Go/blob/master/contest/vs%E9%87%8E%E7%8B%90%E4%B8%AD%E4%B8%8B12%E7%BA%A7.png)  
+![Image text](https://github.com/LiGuer/LiGu-GoBang-AI/blob/master/img/20200621233637.jpg)  
 
 ## Other    
 ###  

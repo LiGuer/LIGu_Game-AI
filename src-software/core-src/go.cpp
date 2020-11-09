@@ -1,49 +1,66 @@
+/*
+Copyright 2020 LiGuer. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+==============================================================================*/
+
 #include "Go.h"
 /******************************************************************************
 *                    基础函数
 ******************************************************************************/
 /*--------------------------------[ 初始化 ]--------------------------------*/
 void Go::init() {
-	Map = (STONE*)malloc(sizeof(STONE) * MapSize * MapSize);
-	clearMap();
+	MainState.player = 0;
+	MainState.Jie[0] = -1;	MainState.Jie[1] = -1;
+	memset(MainState.map, 0, sizeof(STONE) * MapSize * MapSize);
+	memset(MainState.qi, 0, sizeof(STONE) * MapSize * MapSize);
+	memset(MainState.chBlockMap, 0, sizeof(STONE) * MapSize * MapSize);
 	srand((unsigned int)time(NULL));
-}
-/*--------------------------------[ 清空棋盘 ]--------------------------------*/
-void Go::clearMap() {
-	memset(Map, 0, sizeof(STONE) * MapSize * MapSize);
 }
 /*--------------------------------[ 下子 ]--------------------------------*/
 bool Go::setMap(INT8S x, INT8S y, STONE stone) {
 	if (!judgeOutMap(x, y))return false;							//过界
-	if (Map[y * MapSize + x] != 0)return false;						//非空
-
-	STONE maptemp[MapSize * MapSize];
-	memcpy(maptemp, Map, sizeof(STONE) * MapSize * MapSize);
-	INT8U chBlockMap[MapSize * MapSize] = { 0 }, qi[MapSize * MapSize] = { 0 };
-	ComputerQi(maptemp, qi, chBlockMap);
-	judgeNotPoint(maptemp, stone, qi, chBlockMap);
-
-	if (maptemp[y * MapSize + x] == NOTPOINT)return false;			//禁入点
-	return downStone(Map, x, y, stone);								//落子//无气提子
+	if (MainState.map[y * MapSize + x] != 0)return false;			//非空
+	/*---- 标记禁入 ----*/
+	STONE map[MapSize * MapSize];
+	memcpy(map, MainState.map, sizeof(STONE) * MapSize * MapSize);
+	judgeNotPoint(map, stone, MainState.qi, MainState.chBlockMap);	//禁入点
+	if (map[y * MapSize + x] == NOTPOINT)return false;
+	/*---- 落子 ----*/
+	MainState.x = x; MainState.y = y; MainState.player = stone;
+	return downStone(&MainState);									//落子//无气提子
 }
 /*--------------------------------[ 判断是否过界 ]--------------------------------*/
 bool Go::judgeOutMap(int x, int y) {
 	return (x >= 0 && x < MapSize && y >= 0 && y < MapSize) ? true : false;
 }
 /*--------------------------------[ GoAI ]--------------------------------
+根节点[root]被程序自动析构时，其下的整棵树也会依次自动被析构给释放内存。
+只提供AI答案，不对MainState做改变。
 **-----------------------------------------------------------------------*/
-void Go::GoAI(STONE* map, INT8S player, INT8S& x0, INT8S& y0) {
+void Go::GoAI(INT8S& x, INT8S& y, INT8S stone) {
 	/*---- root ----*/
 	MCTSNode root;
 	root.state = new State;
-	root.state->player = -player;
-	root.state->map = (STONE*)malloc(sizeof(STONE) * MapSize * MapSize);
-	memcpy(root.state->map, map, sizeof(STONE) * MapSize * MapSize);
+	root.state->copy(&MainState);
+	root.state->player = - stone;
 	/*---- MCTS ----*/
 	MCTSNode* ans = MCTS(&root);
-	x0 = ans->state->x;
-	y0 = ans->state->y;
-	setMap(x0, y0, -1);
+	if (ans == NULL) {
+		x = -1; y = -1; return;
+	}
+	x = ans->state->x;
+	y = ans->state->y;
 	showTree(&root);
 }
 /******************************************************************************
@@ -52,6 +69,11 @@ void Go::GoAI(STONE* map, INT8S player, INT8S& x0, INT8S& y0) {
 *The process of MCTS is split up into four steps:
 *[1]selection,[2]expansion,[3]simulation,[4]backpropagation.
 *
+* 生成新[State]状态的地方只有两个, Expand 和 Simulation
+* 生成新[State]，必由上一State的复制
+* [State]的内存管理，只能由其构造,析构函数完成
+* [落子]必 算劫,落子,算该棋盘的棋块和气,无气提子,
+		之后，该[State]的棋盘,棋块,气不允许再改动。	(只能malloc暂存内存复制)
 ******************************************************************************/
 /*--------------------------------[ MCTS ]--------------------------------
 *蒙特卡洛树搜索 MCTS:
@@ -60,7 +82,9 @@ void Go::GoAI(STONE* map, INT8S player, INT8S& x0, INT8S& y0) {
 **------------------------------------------------------------------------*/
 MCTSNode* Go::MCTS(MCTSNode* node) {
 	for (int i = 0; i < MctsBudget; i++) {
+		if(i%10000==0)printf("MCTS: %.2f\%%\n", (double)i/ MctsBudget);
 		MCTSNode* expandNode = TreePolicy(node);		//[1][2]
+		if (expandNode == NULL)break;
 		int reward = Simulation(expandNode->state);		//[3]
 		Backpropagation(expandNode, reward);			//[4]
 	}
@@ -77,7 +101,7 @@ MCTSNode* Go::MCTS(MCTSNode* node) {
 **----------------------------------------------------------------------------*/
 MCTSNode* Go::TreePolicy(MCTSNode* node) {
 	MCTSNode* newnode = NULL;
-	while (!judgeWin(node->state->map)) {
+	while (node != NULL && !judgeWin(node->state)) {
 		if (node->isFullChildFlag) {
 			node = Select(node, true); continue;
 		}
@@ -95,8 +119,7 @@ MCTSNode* Go::TreePolicy(MCTSNode* node) {
 若isExploration关闭，则为Exploitation-Only仅利用模式，只按下目前最优的摇臂。
 若isExploration开启，有探索尝试的机会。
 **----------------------------------------------------------------------------*/
-MCTSNode* Go::Select(MCTSNode* node, bool isExploration)
-{
+MCTSNode* Go::Select(MCTSNode* node, bool isExploration){
 	double UcbConst = isExploration == true ? sqrt(2) : 0;
 	double maxScore = -0x7fffffff;
 	MCTSNode* bestnode = NULL;
@@ -128,21 +151,36 @@ double Go::UCB(MCTSNode* node, double C) {
 bool Go::Expand(MCTSNode* node, MCTSNode** newnode) {
 	/*---- New State ----*/
 	State* state = new State;
-	memcpy(state, node->state, sizeof(State));
-	state->player = - node->state->player;
-	state->map = (STONE*)malloc(sizeof(STONE) * MapSize * MapSize);
-	memcpy(state->map, node->state->map, sizeof(STONE) * MapSize * MapSize);
+	state->copy(node->state);
+	state->player = -state->player;
 	/*---- 随机选择动作 ----*/
-	if (!nextStateRand(node, state)) {
-		free(state);return false;
-	}
-	downStone(state->map, state->x, state->y, state->player);
+	if (!nextStateRand(node, state)) {delete state;return false;}
+	downStone(state);		//落子
 	/*---- New Node ----*/
 	*newnode = new MCTSNode;
 	(*newnode)->state = state;
 	(*newnode)->parent = node;
 	node->child[node->childCur++] = (*newnode);
 	return true;
+}
+/*--------------------------------[ [3]Simulation 模拟 ]--------------------------------
+对[node]节点的状态[state]，进行模拟，直到胜利结束。
+返回该状态模拟的[Reward]奖惩值。
+**----------------------------------------------------------------------------*/
+int Go::Simulation(State* state0) {
+	State state;
+	state.copy(state0);
+	/*---- 开始模拟 ----*/
+	state.player = -state.player;
+	int reward = judgeWin(&state);
+
+	while (reward == 0) {
+		if(nextStateRand(&state))								//随机选择下一动作
+			downStone(&state);									//落子
+		state.player = -state.player;							//换子
+		reward = judgeWin(&state);
+	}
+	return reward;
 }
 /*--------------------------------[ [4]Backpropagation 回溯 ]--------------------------------
 将[3]模拟的得到的[Reward]奖惩值，
@@ -157,27 +195,6 @@ void Go::Backpropagation(MCTSNode* node, int reward)
 		node = node->parent;
 	}
 }
-/*--------------------------------[ [3]Simulation 模拟 ]--------------------------------
-对[node]节点的状态[state]，进行模拟，直到胜利结束。
-返回该状态模拟的[Reward]奖惩值。
-**----------------------------------------------------------------------------*/
-int Go::Simulation(State* state0) {
-	State state;
-	memcpy(&state, state0, sizeof(State));
-	state.map = (STONE*)malloc(sizeof(STONE) * MapSize * MapSize);
-	memcpy(state.map, state0->map, sizeof(STONE) * MapSize * MapSize);
-	/*---- 开始模拟 ----*/
-	int reward = judgeWin(state.map);
-	while (reward == 0) {
-		state.player = -state.player;
-		if(nextStateRand(&state))											//随机选择下一动作
-			downStone(state.map, state.x, state.y, state.player);			//落子
-		//showMap(state.map);
-		//printf("%d,%d\n", state.Jie[0], state.Jie[1]);
-		reward = judgeWin(state.map);
-	}
-	return reward;
-}
 /*--------------------------------[ nextStateRand ]--------------------------------
 基于输入[map]棋盘，在可能的动作下，随机选择一个动作
 *	* [a,b)随机整数: (rand() % (b-a))+ a;
@@ -185,10 +202,7 @@ int Go::Simulation(State* state0) {
 bool Go::nextStateRand(State* state) {
 	STONE map[MapSize * MapSize];
 	memcpy(map, state->map, sizeof(STONE) * MapSize * MapSize);
-	/*---- 棋块数气 ----*/
-	INT8U chBlockMap[MapSize * MapSize] = { 0 }, qi[MapSize * MapSize] = { 0 };
-	ComputerQi(map, qi, chBlockMap);
-	judgeEye(map, qi, chBlockMap);//眼点标记
+	judgeEyeAndNot(map, state->player, state->qi, state->chBlockMap);				//眼点&该子禁入点标记
 	/*---- 劫点标记 ----*/
 	if (state->Jie[0] != -1) {
 		map[state->Jie[1] * MapSize + state->Jie[0]] = NOTPOINT;
@@ -208,25 +222,21 @@ bool Go::nextStateRand(State* state) {
 	if (cur == 0)return false;
 	int curRand = rand() % cur;
 	state->x = xMem[curRand];	state->y = yMem[curRand];
-	/*---- 劫判定 ----*/
-	judgeJie(map, state->player, state->x, state->y, qi, chBlockMap, state->Jie);
 	return true;
 }
 bool Go::nextStateRand(MCTSNode* node, State* state) {
 	STONE map[MapSize * MapSize];
 	memcpy(map, node->state->map, sizeof(STONE) * MapSize * MapSize);
-	/*---- 棋块数气 ----*/
-	INT8U chBlockMap[MapSize * MapSize] = { 0 }, qi[MapSize * MapSize] = { 0 };
-	ComputerQi(map, qi, chBlockMap);
-	judgeEye(map, qi, chBlockMap);//眼点标记
-	/*---- 劫点标记 ----*/
-	if (state->Jie[0] != -1){
-		map[state->Jie[1] * MapSize + state->Jie[0]] = NOTPOINT; 
-		state->Jie[0] = -1; state->Jie[1] = -1;
-	}
+	judgeEyeAndNot(map, state->player, state->qi, state->chBlockMap);				//眼点&该子禁入点标记
+
 	/*---- 已经走过子 ----*/
 	for (int i = 0; i < node->childCur; i++)
 		map[node->child[i]->state->y * MapSize + node->child[i]->state->x] = 2;
+	/*---- 劫点标记 ----*/
+	if (state->Jie[0] != -1) {
+		map[state->Jie[1] * MapSize + state->Jie[0]] = NOTPOINT;
+		state->Jie[0] = -1; state->Jie[1] = -1;
+	}	//showMap(map);
 	/*---- 随机走子 ----*/
 	int xMem[MapSize * MapSize] = { 0 };
 	int yMem[MapSize * MapSize] = { 0 };
@@ -241,8 +251,6 @@ bool Go::nextStateRand(MCTSNode* node, State* state) {
 	if (cur == 0)return false;
 	int curRand = rand() % cur;
 	state->x = xMem[curRand];	state->y = yMem[curRand];
-	/*---- 劫判定 ----*/
-	judgeJie(map, state->player, state->x, state->y, qi, chBlockMap, state->Jie);
 	return true;
 }
 /******************************************************************************
@@ -250,22 +258,55 @@ bool Go::nextStateRand(MCTSNode* node, State* state) {
 ******************************************************************************/
 /*--------------------------------[ [1]:落子提子 ]--------------------------------
 [RULE 1]:无气提子
+[RULE 3]:劫判定
 **-------------------------------------------------------------------------------*/
-bool Go::downStone(STONE* map, INT8S x0, INT8S y0, STONE stone) {
-	map[y0 * MapSize + x0] = stone;
+bool Go::downStone(State* state) {
+	/*---- 劫判定 ----*/
+	judgeJie(state->map, state->player, state->x, state->y, state->qi, state->chBlockMap, state->Jie);
+	/*---- 落子 ----*/
+	state->map[state->y * MapSize + state->x] = state->player;
 	/*---- 棋块数气 ----*/
-	INT8U chBlockMap[MapSize * MapSize] = { 0 }, qi[MapSize * MapSize] = { 0 };
-	
-	ComputerQi(map, qi, chBlockMap);
+	memset(state->qi, 0, sizeof(INT8U) * MapSize * MapSize);
+	memset(state->chBlockMap, 0, sizeof(INT8U) * MapSize * MapSize);
+	ComputerQi(state->map, state->qi, state->chBlockMap);
 	/*---- 无气提子 ----*/
 	for (int x = 0; x < MapSize * MapSize; x++)
-		if (qi[chBlockMap[x]] == 0 && chBlockMap[x] != chBlockMap[y0 * MapSize + x0])map[x] = 0;
+		if (state->qi[state->chBlockMap[x]] == 0 && state->chBlockMap[x] != state->chBlockMap[state->y * MapSize + state->x])
+			state->map[x] = 0;
 	return true;
+}
+/*--------------------------------[ [2]:禁入点标记 ]--------------------------------
+*	*输入: [1] 棋盘map	[2] 己方颜色	[3] 气	[4] 棋块
+*	*输出: [1] 被标记己方禁入点的棋盘
+*	[RULE 2]:非提禁入
+*	禁入点: [1]我无气	[2]非杀他
+*	*禁入点判定: [1]上下左右若是我，只一气；若是敌，必不只一气；上下左右不为空
+**-------------------------------------------------------------------------------*/
+void Go::judgeNotPoint(STONE* map, STONE stone, INT8U qi[], INT8U chBlockMap[]) {
+	for (int y = 0; y < MapSize; y++) {
+		for (int x = 0; x < MapSize; x++) {
+			if (map[y * MapSize + x] == 0) {
+				bool flagMe = 1;
+				for (int i = 0; i < 4; i++) {
+					INT8S xt = x + x_step[i], yt = y + y_step[i];
+					if (yt < 0 || xt < 0 || yt >= MapSize || xt >= MapSize)continue;	//过界
+					/*---- 核心判断 ----*/
+					if (map[yt * MapSize + xt] == 0															//上下左右应不为空
+						|| (map[yt * MapSize + xt] == stone && qi[chBlockMap[yt * MapSize + xt]] != 1)		//若是我，应只一气
+						|| (map[yt * MapSize + xt] != stone && qi[chBlockMap[yt * MapSize + xt]] == 1)) {	//若是敌，应必不只一气
+						flagMe = 0;
+					}
+				}
+				if (flagMe)map[y * MapSize + x] = NOTPOINT;
+			}
+		}
+	}
 }
 /*--------------------------------[ 眼点标记 ]--------------------------------
 *	*输入: [1] 棋盘map	[3] 气	[4] 棋块
-*	*输出: [1] 被标记眼点的棋盘
-*	眼点: 对方的禁入点
+*	*输出: [1] 被标记眼点的棋盘 (双方都标记)
+*	眼点: 敌方禁入点，且上下左右皆为我
+		我方眼点->敌方禁入点，敌方禁入点-/>我方眼点
 *	*判定: [1] 只一空点	[2] 上下左右同一色	[3]上下左右棋块，均非一气
 **------------------------------------------------------------------------------*/
 void Go::judgeEye(STONE* map, INT8U qi[], INT8U chBlockMap[]) {
@@ -278,37 +319,40 @@ void Go::judgeEye(STONE* map, INT8U qi[], INT8U chBlockMap[]) {
 					if (yt < 0 || xt < 0 || yt >= MapSize || xt >= MapSize) continue;			//过界
 					/*---- 核心判断 ----*/
 					who += map[yt * MapSize + xt];
-					if(map[yt * MapSize + xt] * who <= 0 || qi[chBlockMap[yt * MapSize + xt]] == 1) { flag = 0; break; }
+					if (map[yt * MapSize + xt] * who <= 0 || qi[chBlockMap[yt * MapSize + xt]] == 1) { flag = 0; break; }
 				}
 				if (flag)map[y * MapSize + x] = NOTPOINT + (who > 0 ? 1 : -1);
 			}
 		}
 	}
 }
-/*--------------------------------[ [2]:禁入点标记 ]--------------------------------
-*	*输入: [1] 棋盘map	[2] 己方颜色	[3] 气	[4] 棋块
-*	*输出: [1] 被标记己方禁入点的棋盘
-*	[RULE 2]:非提禁入
-*	禁入点: [1]我无气	[2]非杀他
-**-------------------------------------------------------------------------------*/
-void Go::judgeNotPoint(STONE* map, STONE stone, INT8U qi[], INT8U chBlockMap[]) {
+/*--------------------------------[ 眼点+禁入点标记 ]--------------------------------
+*	*输入: [1] 棋盘map	[3] 气	[4] 棋块
+*	*输出: [1] 被标记眼点的棋盘(双方都标记)
+*	眼点: 敌方禁入点，且上下左右皆为我					#bug: 算的是 真眼还是假眼
+		我方眼点->敌方禁入点，敌方禁入点-/>我方眼点
+*	我方禁入点不能走，敌方禁入点兼我必占点(眼点)不必走
+
+*	*眼点判定: [1]上下左右皆我，且均非一气
+*	*禁入点判定: [1]上下左右若是我，只一气；若是敌，必不只一气；上下左右不为空
+**------------------------------------------------------------------------------*/
+void Go::judgeEyeAndNot(STONE* map, STONE stone, INT8U qi[], INT8U chBlockMap[]) {
 	for (int y = 0; y < MapSize; y++) {
 		for (int x = 0; x < MapSize; x++) {
 			if (map[y * MapSize + x] == 0) {
-				bool flagMe = 1, flagArmy = 0;
+				bool flagEye = 1, flagMe = 1;
 				for (int i = 0; i < 4; i++) {
 					INT8S xt = x + x_step[i], yt = y + y_step[i];
-					if (yt < 0 || xt < 0 || yt >= MapSize || xt >= MapSize)continue;	//过界
+					if (yt < 0 || xt < 0 || yt >= MapSize || xt >= MapSize) continue;			//过界
 					/*---- 核心判断 ----*/
-					if (map[yt * MapSize + xt] == 0 || (map[yt * MapSize + xt] == stone && qi[chBlockMap[yt * MapSize + xt]] != 1)) {
-						flagMe = 0; break;										//该子有气，非禁入
-					}
-					if (qi[chBlockMap[yt * MapSize + xt]] == 1) {				//存在一气棋块
-						if (map[yt * MapSize + xt] == stone)flagMe = 1;			//杀己，禁入
-						else flagArmy = 1;										//杀他，非禁入
+					if (map[yt * MapSize + xt] != stone || qi[chBlockMap[yt * MapSize + xt]] == 1) { flagEye = 0; }
+					if (map[yt * MapSize + xt] == 0															//上下左右应不为空
+						|| (map[yt * MapSize + xt] == stone && qi[chBlockMap[yt * MapSize + xt]] != 1)		//若是我，应只一气
+						|| (map[yt * MapSize + xt] != stone && qi[chBlockMap[yt * MapSize + xt]] == 1) ) {	//若是敌，应必不只一气
+						flagMe = 0;
 					}
 				}
-				if (flagMe && !flagArmy)map[y * MapSize + x] = NOTPOINT;		//[1]我无气//[2]非杀他
+				if (flagEye || flagMe)map[y * MapSize + x] = NOTPOINT;
 			}
 		}
 	}
@@ -324,7 +368,6 @@ void Go::judgeNotPoint(STONE* map, STONE stone, INT8U qi[], INT8U chBlockMap[]) 
 **------------------------------------------------------------------------*/
 bool Go::judgeJie(STONE* map, STONE stone, INT8S x0, INT8S y0, INT8U qi[], INT8U chBlockMap[], INT8S Jie0[]) {
 	bool Jieflag = 1, JieAramy = 0;
-	INT8S Jie[2] = { -1,-1 };
 	for (int i = 0; i < 4; i++) {
 		INT8S xt = x0 + x_step[i], yt = y0 + y_step[i];
 		if (yt < 0 || xt < 0 || yt >= MapSize || xt >= MapSize) continue;			//过界
@@ -340,34 +383,30 @@ bool Go::judgeJie(STONE* map, STONE stone, INT8S x0, INT8S y0, INT8U qi[], INT8U
 				if (ytt < 0 || xtt < 0 || ytt >= MapSize || xtt >= MapSize || (ytt == y0 && xtt == x0)) continue;			//过界
 				if (map[ytt * MapSize + xtt] != stone) { Jieflag = 0; JieAramy = 0; break; }
 			}
-			if (JieAramy) { Jie[0] = xt; Jie[1] = yt; Jieflag = 1; }
+			if (JieAramy) { Jie0[0] = xt; Jie0[1] = yt; Jieflag = 1; }
 		}
 	}
-	if (Jieflag) { Jie0[0] = Jie[0]; Jie0[1] = Jie[1]; return true; }
-	return false;
+	if (Jieflag) return true; 
+	Jie0[0] = -1;Jie0[1] = -1;return false;
 }
 /*--------------------------------[ [4]:输赢判定(数子法) ]--------------------------------
 *	[RULE 4]:局势判定(数子法)
 *	无气杀我非杀他，为禁入
 **----------------------------------------------------------------------------------------*/
-int Go::judgeWin(STONE* map) {										//[RULE 4]:局势判定(数子法)
-	STONE mapTemp[MapSize * MapSize] = { 0 };
-	memcpy(mapTemp, map, sizeof(STONE) * MapSize * MapSize);
-	/*---- 棋块数气 ----*/
-	INT8U chBlockMap[MapSize * MapSize] = { 0 }, qi[MapSize * MapSize] = { 0 };
-	ComputerQi(map, qi, chBlockMap);
-	/*---- 标记眼点 ----*/
-	judgeEye(mapTemp, qi, chBlockMap);
+int Go::judgeWin(State* state) {	//[RULE 4]:局势判定(数子法)
+	STONE map[MapSize * MapSize] = { 0 };
+	memcpy(map, state->map, sizeof(STONE) * MapSize * MapSize);
+	judgeEye(map, state->qi, state->chBlockMap);
 	/*---- 是否存在可下子点 ----*//*---- 已经终局，数子法 ----*/
-	INT8U ScoreBlack = 0, ScoreWhite = 0;
+	double ScoreBlack = 0, ScoreWhite = 0;
 	for (int x = 0; x < MapSize * MapSize; x++) {
-		if (mapTemp[x] == 0)return 0;
-		else if (mapTemp[x] == Black)ScoreBlack++;
-		else if (mapTemp[x] == White)ScoreWhite++;
-		else if (mapTemp[x] == NOTPOINT + White)ScoreBlack++;
-		else if (mapTemp[x] == NOTPOINT + White)ScoreWhite++;
+		if (map[x] == 0)return 0;
+		else if (map[x] == Black)ScoreBlack++;
+		else if (map[x] == White)ScoreWhite++;
+		else if (map[x] == NOTPOINT + Black)ScoreBlack++;
+		else if (map[x] == NOTPOINT + White)ScoreWhite++;
 	}
-	return ScoreBlack > ScoreWhite ? 1 : -1;
+	return ScoreBlack - TieZi > ScoreWhite ? 1 : -1;		//贴子
 }
 /*--------------------------------[ 棋块数气 ]--------------------------------
 *	*输入: [1] 棋盘map
@@ -376,6 +415,8 @@ int Go::judgeWin(STONE* map) {										//[RULE 4]:局势判定(数子法)
 *	气: 
 **--------------------------------------------------------------------------*/
 void Go::ComputerQi(STONE* map, INT8U qi[], INT8U chBlockMap[]) {
+	memset(qi, 0, sizeof(INT8U) * MapSize * MapSize);
+	memset(chBlockMap, 0, sizeof(INT8U) * MapSize * MapSize);
 	INT8S chBlockCur = 1;
 	/*---- 棋块标记 ----*/
 	INT8S HeadStoneFlag[MapSize * MapSize] = { 0 };			//并查集头节点标记
@@ -440,13 +481,16 @@ void Go::ComputerQi(STONE* map, INT8U qi[], INT8U chBlockMap[]) {
 **-------------------------------------------------------------------------*/
 void Go::showMap(STONE* map)
 {
-	printf("\n");
+	printf("\n  ");
+	for (int y = 0; y < MapSize; y++) {printf("%c ", 'A' + y);}printf("\n");
 	for (int y = 0; y < MapSize; y++) {
+		printf("%c ", 'A' + y);
 		for (int x = 0; x < MapSize; x++) {
-			if (map[y * MapSize + x] == 1)printf("@ ");
-			else if (map[y * MapSize + x] == -1)printf("o ");
-			else if (map[y * MapSize + x] == 0)printf("+ ");
-			else printf("x ");
+			if (map[y * MapSize + x] == 1)printf("@");
+			else if (map[y * MapSize + x] == -1)printf("o");
+			else if (map[y * MapSize + x] == 0)printf("+");
+			else printf("x");
+			printf(" ");
 		}printf("\n");
 	}
 }
