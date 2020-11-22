@@ -1,15 +1,20 @@
 #include "MapModule.h"
 
-MapModule::MapModule(QWidget *parent) : QWidget(parent)
+MapModule::MapModule(QWidget *parent,int _LineNum) : QWidget(parent)
 {
+    LineNum = _LineNum;
+    WindowSize = (LineNum-1)*GridSize+BoardMargin*2;
+    XIndexLabel = new QLabel*[LineNum];
+    YIndexLabel = new QLabel*[LineNum];
+
     setIndexLabel(this);
 }
 void MapModule::setIndexLabel(QWidget *widget)
 {
     for(int i = 0; i < LineNum; i++){
+        char index='A' + (char)i;
         XIndexLabel[i]=new QLabel(widget);
         YIndexLabel[i]=new QLabel(widget);
-        char index='A' + i;
         XIndexLabel[i]->setText(QString(index));
         YIndexLabel[i]->setText(QString(index));
     }

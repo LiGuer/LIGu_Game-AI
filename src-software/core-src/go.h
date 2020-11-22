@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef GOBANG_H
-#define GOBANG_H
+#ifndef GO_H
+#define GO_H
 #include<stdio.h>
 #include<stdlib.h>
 #include<math.h>
@@ -90,7 +90,7 @@ public:
 	const int MctsBudget = 100000;
 	const INT8S NOTPOINT = 10;										//禁入点标记//眼点标记 = 禁入点标记+棋子标记
 	const INT8S x_step[4] = { 1,-1,0,0 }, y_step[4] = { 0,0,1,-1 };
-	const double TieZi = 2 * 1.75;										//贴子
+    const double TieZi = 2 * 1.75;										//贴子z
 	/*---------------- 基础函数 ----------------*/
 	void init();													//初始化
 	void setMainState() { ; }								//清盘

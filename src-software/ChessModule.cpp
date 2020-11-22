@@ -1,9 +1,11 @@
 #include "ChessModule.h"
-#include "MapModule.h"
-#include<QDebug>
-ChessModule::ChessModule(QWidget *parent) : QWidget(parent)
+
+ChessModule::ChessModule(QWidget *parent, int _Mode) : QWidget(parent)
 {
-    go->init();
+    Mode = _Mode;
+    Mode == 0?go->init():gobang->init();
+    MapSize = Mode == 0?go->MapSize:gobang->MapSize;
+
     resize(1000,1000);
     setAttribute(Qt::WA_TranslucentBackground, true);
     ChessWarn->setStyleSheet("QLabel{background:#FF0000;}");
@@ -12,8 +14,7 @@ ChessModule::ChessModule(QWidget *parent) : QWidget(parent)
     WinLable->setGeometry(0,0,0,0);
     WinLable->setFont(font);
     WinLable->setText("");
-    for(int i=0;i<go->MapSize*go->MapSize;i++)
-        Chess[i]=new QLabel(this);
+    for(int i=0;i<361;i++)Chess[i]=new QLabel(this);
 }
 void ChessModule::mousePressEvent(QMouseEvent *e)
 {
@@ -22,43 +23,49 @@ void ChessModule::mousePressEvent(QMouseEvent *e)
         //======人黑子======
         x =(e->x()-MapModule::BoardMargin+MapModule::GridSize/2)/MapModule::GridSize;
         y =(e->y()-MapModule::BoardMargin+MapModule::GridSize/2)/MapModule::GridSize;
-        if(!go->setMap(x,y,go->Black))return;
-        PrintChess(go->Map);
+        if(Mode == 0){
+            if(!go->setMap(x,y,go->Black))return;
+            PrintChess(go->MainState.map);
+        }
+        else{
+            if(!gobang->setMap(x,y,gobang->Black))return;
+            PrintChess(gobang->Map);
+        }
+
     }
-    else if(e->button()==Qt::RightButton){   //右键按下
-        x =(e->x()-MapModule::BoardMargin+MapModule::GridSize/2)/MapModule::GridSize;
-        y =(e->y()-MapModule::BoardMargin+MapModule::GridSize/2)/MapModule::GridSize;
-        if(!go->setMap(x,y,go->White))return;
-        PrintChess(go->Map);
-    }
-    else if(e->button()==Qt::MidButton){//中键按下
-        //======电脑黑子======
-        go->GoAI(go->Map,go->Black,x,y);
-        PrintChess(go->Map);
+    else if(e->button()==Qt::MidButton){
     }
     //======若赢======
-    if(go->judgeWin(go->Map)==1){
-        WinLable->setGeometry(0,0,1000,1000);
-        WinLable->setText("You Win");
-        return;
-    }
+    if(Mode == 0 && go->judgeWin(&go->MainState)==go->Black){PrintWin(1);return;}
+    if(Mode == 1 && gobang->judgeWin(gobang->Map)==gobang->Black){PrintWin(1);return;}
     //======电脑白子======
-    go->GoAI(go->Map,go->White,x,y);
-    PrintChess(go->Map);
+    if(Mode == 0){
+        go->GoAI(x,y,go->White);
+        if(!go->setMap(x,y,go->White))return;
+        PrintChess(go->MainState.map);
+    }
+    else {
+        position a = gobang->GoBangAns(gobang->White);
+        x = a.x; y = a.y;
+        PrintChess(gobang->Map);
+    }
     ChessWarn->setGeometry(MapModule::BoardMargin+x*MapModule::GridSize-ChessSize/2,MapModule::BoardMargin+y*MapModule::GridSize-ChessSize/2,3,3);
     //======若赢======
-    if(go->judgeWin(go->Map)==-1){
-        WinLable->setGeometry(0,0,1000,1000);
-        WinLable->setText("You Lose");
-        return;
-    }
+    if(Mode == 0 && go->judgeWin(&go->MainState)==go->White){PrintWin(0);return;}
+    if(Mode == 1 && gobang->judgeWin(gobang->Map)==gobang->White){PrintWin(0);return;}
+}
+void ChessModule::PrintWin(bool win)
+{
+    WinLable->setGeometry(0,0,1000,1000);
+    if(win)WinLable->setText("You Win");
+    else WinLable->setText("You Lose");
 }
 void ChessModule::PrintChess(INT8S* map)
 {
     int ChessCur = 0;
-    for(int z=0;z<go->MapSize*go->MapSize;z++){
+    for(int z=0;z<MapSize*MapSize;z++){
         if(map[z]!=0){
-            int x = z%go->MapSize,y=z/go->MapSize;
+            int x = z%MapSize,y=z/MapSize;
             x = MapModule::BoardMargin+x*MapModule::GridSize-ChessSize/2;
             y = MapModule::BoardMargin+y*MapModule::GridSize-ChessSize/2;
 
@@ -69,5 +76,5 @@ void ChessModule::PrintChess(INT8S* map)
             ChessCur++;
         }
     }
-    for(int i=ChessCur;i<go->MapSize*go->MapSize;i++)Chess[i]->hide();
+    for(int i=ChessCur;i<MapSize*MapSize;i++)Chess[i]->hide();
 }

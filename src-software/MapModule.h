@@ -8,13 +8,15 @@
 class MapModule : public QWidget
 {
 public:
-    MapModule(QWidget *parent);
-    const static short GridSize=50,LineNum = 9,BoardMargin=30;
-    int WindowSize = (LineNum-1)*GridSize+BoardMargin*2;
+    MapModule(QWidget *parent,int _LineNum);
+    static const short GridSize=50,BoardMargin=30;
+    short LineNum = 9;
+    int WindowSize;
+    QLabel** XIndexLabel,**YIndexLabel;
+
+    void setIndexLabel(QWidget *widget);
 protected:
     void paintEvent(QPaintEvent *event);
-private:
-    QLabel *XIndexLabel[LineNum],*YIndexLabel[LineNum];
-    void setIndexLabel(QWidget *widget);
+
 };
 #endif // MapModule_H

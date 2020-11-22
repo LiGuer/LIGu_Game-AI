@@ -8,17 +8,17 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = 0);
     ~MainWindow();
-private:
+
     //======常数======
-    short WindowSize[2]={960,960};
+    short WindowSize, Mode = 0;
     //======图层======
     MapModule *mapModule;
     ChessModule *chessModule;
-    QWidget *MapWidget=new QWidget(this);   //网格
-    QWidget *ChessWidget=new QWidget(this);  //棋子
+    QWidget *MapWidget=new QWidget(this);       //网格
+    QWidget *ChessWidget=new QWidget(this);     //棋子
     //======函数======
-    void setGridWidget(QWidget* widget);//绘制网格界面
-    void setChessWidget(QWidget *widget);//绘制棋子界面
+    void setGridWidget(QWidget* widget);        //绘制网格界面
+    void setChessWidget(QWidget *widget);       //绘制棋子界面
 };
 
 #endif // MAINWINDOW_H

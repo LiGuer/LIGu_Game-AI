@@ -2,24 +2,28 @@
 //==========结构函数==========
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
 {
-    setMaximumSize(WindowSize[0],WindowSize[1]);
-    setMinimumSize(WindowSize[0],WindowSize[1]);//固定软件界面的大小
-    setWindowTitle("LiguのGo");
+    printf("Input GameMode (Go/GoBang: 0/1):");
+    scanf("%d",&Mode);
+
+    WindowSize = 50 * (Mode == 0 ? 9 : 15);
+    setMaximumSize(WindowSize,WindowSize);
+    setMinimumSize(WindowSize,WindowSize);//固定软件界面的大小
+    setWindowTitle("Daiyu-Go");
     setWindowOpacity(0.8);
     //======MapModule======
     setGridWidget(MapWidget);
-    mapModule = new MapModule(MapWidget);
-    mapModule->setGeometry(0,0,WindowSize[0],WindowSize[1]);
+    mapModule = new MapModule(MapWidget, WindowSize / 50);
+    mapModule->setGeometry(0,0,WindowSize,WindowSize);
 
     setChessWidget(ChessWidget);
-    chessModule = new ChessModule(ChessWidget);
-    mapModule->setGeometry(0,0,WindowSize[0],WindowSize[1]);
+    chessModule = new ChessModule(ChessWidget, Mode);
+    mapModule->setGeometry(0,0,WindowSize,WindowSize);
 }
 MainWindow::~MainWindow(){}
 //==========界面生成==========
 void MainWindow::setGridWidget(QWidget *widget)
 {
-    widget->setGeometry(0,0,WindowSize[0],WindowSize[1]);
+    widget->setGeometry(0,0,WindowSize,WindowSize);
     QPalette pal(widget->palette());
     pal.setColor(QPalette::Background,QColor(255,255,255));
     widget->setAutoFillBackground(true);
@@ -28,7 +32,7 @@ void MainWindow::setGridWidget(QWidget *widget)
 }
 void MainWindow::setChessWidget(QWidget *widget)
 {
-    widget->setGeometry(0,0,WindowSize[0],WindowSize[1]);
+    widget->setGeometry(0,0,WindowSize,WindowSize);
     QPalette pal(widget->palette());
     pal.setColor(QPalette::Background,QColor(0,0,0,0));
     widget->setAutoFillBackground(true);

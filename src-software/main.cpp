@@ -2,7 +2,8 @@
 #include <QApplication>
 
 int main(int argc, char *argv[])
-{setvbuf(stdout, 0, _IONBF, 0);
+{
+    setvbuf(stdout, 0, _IONBF, 0);
     QApplication a(argc, argv);
     MainWindow w;
     w.show();

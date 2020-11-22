@@ -5,7 +5,7 @@
 #-------------------------------------------------
 
 QT       += core gui
-
+QMAKE_CXXFLAGS_RELEASE += -O3       # Release -O3
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = GoBang
@@ -30,12 +30,14 @@ SOURCES += \
     MapModule.cpp \
     ChessModule.cpp \
     core-src/go.cpp \
+    core-src/gobang.cpp
 
 HEADERS += \
     mainwindow.h \
     ChessModule.h \
     MapModule.h \
     core-src/go.h \
+    core-src/gobang.h
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
