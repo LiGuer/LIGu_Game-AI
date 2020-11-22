@@ -1,7 +1,7 @@
 # Daiyu-Go	黛玉-Go 
 The AI of [Go],[GoBang] named "Daiyu黛玉".
 ## [1].Go 围棋  
-* [核心程序]: < go.h/cpp >
+* <go.h/cpp>
 * [核心思想]: "频率估计概率"  ->用一千万次随机下子,估计每一点的胜率。(十万场,平均每场一百步)
 * [核心算法]:  
 	* 蒙特卡洛树搜索MCTS  
