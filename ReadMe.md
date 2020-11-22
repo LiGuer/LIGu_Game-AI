@@ -2,9 +2,9 @@
 The AI of [Go],[GoBang] named "Daiyu黛玉".
 ## [1].Go 围棋  
 * core: <go.h/cpp>
-* 核心思想: "频率估计概率"
-           用一千万次随机下子,估计每一点的胜率,来寻找最优的落子点。
-		   (十万场,平均每场一百步)
+* 核心思想: "频率估计概率"  
+           用一千万次随机下子,估计每一点的胜率,来寻找最优的落子点。  
+		   (十万场,平均每场一百步)  
 * 核心算法:  
 	* 蒙特卡洛树搜索MCTS  
 		[1] 选择 | 依据UCB公式,选择节点,兼顾Exploit & Explore  
@@ -16,14 +16,14 @@ The AI of [Go],[GoBang] named "Daiyu黛玉".
 	[other] 真眼活棋  
 
 * 注.目前围棋一子思考时间是27秒以内,暂无游戏体验感,后期进一步优化。  
-     五子棋速度可以。
+     五子棋速度可以。  
 
 ## [2].GoBang 五子棋  
-* core: <gobang.h/cpp>
-* The program of GoBang-AI is in the src/gobang.cpp and gobang.h.  
-* The algorithm of GoBang-AI is "Minimax".
+* core: <gobang.h/cpp>  
+* The program of GoBang-AI is in the src/gobang.cpp and gobang.h.   
+* The algorithm of GoBang-AI is "Minimax".  
 * The UI is built by QT.  
-* ------------------
+* ------------------  
 * core: <gobang.h/cpp>  
 * 算法:  
 	* 决策树, 深度优先搜索, 遍历4层所有下棋情况
