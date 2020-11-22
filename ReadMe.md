@@ -1,19 +1,18 @@
 # Daiyu-Go	黛玉-Go 
 The AI of [Go],[GoBang] named "Daiyu黛玉".
 ## [1].Go 围棋  
-* [核心程序]: <go.h/cpp>
-* [核心思想]: 频率估计概率 
-			—— 用一千万次随机下子,估计每一点的胜率。 (十万场,平均每场一百步)
+* [核心程序]: < go.h/cpp >
+* [核心思想]: "频率估计概率"  ->用一千万次随机下子,估计每一点的胜率。(十万场,平均每场一百步)
 * [核心算法]:  
-    [1] 蒙特卡洛树搜索MCTS  
+	* 蒙特卡洛树搜索MCTS  
 		[1] 选择 | 依据UCB公式,选择节点,兼顾Exploit & Explore  
 		[2] 拓展 | 扩展新的树节点  
 		[3] 模拟 | 对新增节点进行随机走子,直至终盘,得到一场随机比赛结果  
 		[4] 回溯 | 将模拟所得输赢结果,从新增节点开始向根节点回溯(更新节点权值)  
 * [围棋规则]:  
-        [1]无气提子 [2]非提禁入 [3]劫隔一手 [4]数子法判定输赢
-		[other] 真眼活棋 
-* 关键程序API：  
+        [1]无气提子 [2]非提禁入 [3]劫隔一手 [4]数子法判定输赢  
+		[other] 真眼活棋  
+* [关键程序API]:  
 ### [MCTS]核心函数  
 ```
 	MCTSNode* MCTS(MCTSNode* node);									//[MCTS]蒙特卡洛树搜索  
@@ -27,10 +26,10 @@ The AI of [Go],[GoBang] named "Daiyu黛玉".
 ```
 ### 围棋规则函数  
 ```
-	bool downChess(CHESS* map, INT8S x0, INT8S y0, CHESS chess);	//[RULE 1]:无气提子//落子
-	void judgeNotPoint(CHESS* map, CHESS chess);					//[RULE 2]:非提禁入
-	int judgeWin(CHESS* map);										//[RULE 4]:局势判定(数子法)
-	void ComputerQi(CHESS* map, INT8U qi[], INT8U chBlockMap[]);	//棋块数气
+	bool downChess(CHESS* map, INT8S x0, INT8S y0, CHESS chess);	//[RULE 1]:无气提子//落子  
+	void judgeNotPoint(CHESS* map, CHESS chess);					//[RULE 2]:非提禁入  
+	int judgeWin(CHESS* map);										//[RULE 4]:局势判定(数子法)  
+	void ComputerQi(CHESS* map, INT8U qi[], INT8U chBlockMap[]);	//棋块数气  
 ```
   
 ## [2].GoBang 五子棋  
@@ -39,7 +38,7 @@ The AI of [Go],[GoBang] named "Daiyu黛玉".
 * The algorithm of GoBang-AI is "Minimax".
 * The UI is built by QT.  
 * ------------------
-* [核心程序]: <gobang.h/cpp>
+* [核心程序]: < gobang.h/cpp >  
 * [算法]:  
 		* 决策树, 深度优先搜索, 遍历4层所有下棋情况
 		* 剪枝算法:   
@@ -59,7 +58,7 @@ The AI of [Go],[GoBang] named "Daiyu黛玉".
 * MCTS[3]模拟阶段，随机落子至满盘，  
 9x9平均可落120手  
 19x19平均可落500手  
-
-###  
-蒙特卡洛树，通过析构函数，实现子节点内存递归释放。  
+  
+###   
+* 蒙特卡洛树，通过析构函数，实现子节点内存递归释放。  
 * free()无法调用释放对象的析构函数，而delete可以。  
