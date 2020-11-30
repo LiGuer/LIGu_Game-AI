@@ -34,10 +34,13 @@ The AI of [Go],[GoBang] named "Daiyu黛玉".
 	* Policy():决策函数/博弈树(极小化极大值算法)  
 	* Evaluate():评价函数，棋局分数评价判断。 
 
+<<<<<<< HEAD
 ## [3].Chess 国际象棋
 * core: <chess.h/cpp>  
 * 未完成, 待续
 
+=======
+>>>>>>> 46ef8da68ca3bb560c9eeec79d06f6ac17695283
 ## Image
 ![Image text](https://github.com/LiGuer/Daiyu-Go/blob/master/contest/vs%E9%87%8E%E7%8B%90%E4%B8%AD%E4%B8%8B12%E7%BA%A7.png)  
 ![Image text](https://github.com/LiGuer/Daiyu-Go/blob/master/contest/20201122182136.png)  
@@ -46,6 +49,7 @@ The AI of [Go],[GoBang] named "Daiyu黛玉".
 ## 核心函数API  
 ### [MCTS]核心函数  
 ```
+<<<<<<< HEAD
 	MCTSNode* MCTS(MCTSNode* node);									//[MCTS]蒙特卡洛树搜索
 	MCTSNode* Select(MCTSNode* node, bool isExploration);			//[1]选择最优节点
 	bool Expand(MCTSNode* node, MCTSNode** newnode);				//[2]拓展新节点
@@ -64,6 +68,23 @@ The AI of [Go],[GoBang] named "Daiyu黛玉".
 	void judgeEye(STONE* map, INT8U qi[], INT8U chBlockMap[]);
 	void judgeEyeAndNot(STONE* map, STONE stone, INT8U qi[], INT8U chBlockMap[]);
 	int judgeWin(State* state);										//[RULE 4]:局势判定(数子法)
+=======
+	MCTSNode* MCTS(MCTSNode* node);									//[MCTS]蒙特卡洛树搜索  
+	MCTSNode* Select(MCTSNode* node, bool isExploration);			//[1]选择最优节点  
+	MCTSNode* Expand(MCTSNode* node);								//[2]拓展新节点  
+	int Simulation(State* state0);									//[3]模拟,快速走子  
+	void Backpropagation(MCTSNode* node, int reward);				//[4]回溯  
+    double UCB(MCTSNode* node, double C);							//UCB公式  
+	MCTSNode* TreePolicy(MCTSNode* node);							//  
+	bool nextStateRand(CHESS* map, INT8S& x0, INT8S& y0, CHESS chess);//随机走子  
+```
+### 围棋规则函数  
+```
+	bool downChess(CHESS* map, INT8S x0, INT8S y0, CHESS chess);	//[RULE 1]:无气提子//落子  
+	void judgeNotPoint(CHESS* map, CHESS chess);					//[RULE 2]:非提禁入  
+	int judgeWin(CHESS* map);										//[RULE 4]:局势判定(数子法)  
+	void ComputerQi(CHESS* map, INT8U qi[], INT8U chBlockMap[]);	//棋块数气  
+>>>>>>> 46ef8da68ca3bb560c9eeec79d06f6ac17695283
 ```
   
 ## Other    
