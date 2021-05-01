@@ -1,16 +1,21 @@
 #ifndef MINIMAX_H
 #define MINIMAX_H
+#include <vector>
 template<class State>
 class MiniMax {
 public:
-	int MaxLevel;
-	int		(*Evaluate)		(State*);					//评价函数
-	State*	(*newStateFunc)	(State*);					//生成新状态
+	int MaxLevel = 5;
+	int  (*Evaluate)		(State&);					//评价函数
+	bool (*newStateFunc)	(State&, State&);			//生成新状态
+	char (*judgeWin)		(State&);					//生成新状态
+	std::vector<int> ansScoreSet;
+	State maxScoreState;
 	/*----------------[ 构造/析构函数 ]----------------*/
-	MiniMax(int(*_Evaluate)(State*), State* (*_newStateFunc)(State*),int _MaxLevel = 5) {
+	MiniMax(int(*_Evaluate)(State&), bool(*_newStateFunc)(State&, State&), char(*_judgeWin)(State&),int _MaxLevel = 5) {
 		Evaluate     = _Evaluate;
 		newStateFunc = _newStateFunc;
 		MaxLevel	 = _MaxLevel;
+		judgeWin	 = _judgeWin;
 	}
 	/******************************************************************************
 	*                    决策函数  博弈树
@@ -23,21 +28,25 @@ public:
 					[3.2] 双数博弈层(我  层) 取最大
 					[3.3] alpha-beta剪枝
 	******************************************************************************/
-	int Policy(char level, State* state, int alpha, int beta) {
+	int Policy(char level, State& state, int alpha, int beta) {
 		//[0]
-		if (level > MaxLevel)
+		if (level > MaxLevel || judgeWin(state) != 0)
 			return Evaluate(state);
 		int max = -0x7fffffff, 
 			min =  0x7fffffff;
 		//[1]
-		State* newState;
-		for ((newState = newStateFunc(state)) != NULL) {
+		State newState = state;
+		while (newStateFunc(state, newState)) {
 			//[2]
 			int score = Policy(level + 1, newState, alpha, beta);
 			//[3]
-			level % 2 == 1 ?
-				min = min < score ? min : score, beta  = beta  < score ? beta  : score:
-				max = max > score ? max : score, alpha = alpha > score ? alpha : score;
+			if (level == 0) {
+				ansScoreSet.push_back(score);
+				if (score > max) maxScoreState = newState;
+			}
+			level % 2 == 0 ?
+				max = max >= score ? max : score, alpha = alpha >= score ? alpha : score:
+				min = min <= score ? min : score,  beta =  beta <= score ?  beta : score;
 			if (alpha >= beta) 
 				return level % 2 == 0 ? max : min;
 		}
