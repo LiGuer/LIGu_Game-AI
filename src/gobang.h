@@ -26,7 +26,7 @@ namespace GoBang_AI {
 #define BLACK  1
 #define WHITE -1
 	struct State {
-		char player, pos = -1;
+		char me, player, pos = -1;
 		Mat<CHESS> board{ 15, 15 };
 		CHESS& operator[](int i)		{ return board[i]; }
 		CHESS& operator()(int i, int j) { return board(i, j); }
@@ -45,6 +45,7 @@ namespace GoBang_AI {
 		Mat<CHESS> boardMat(15, 15);
 		boardState.board.getData(board);
 		boardState.player = -who;
+		boardState.me	  =  who;
 		run(boardState, x, y);
 	}
 	void run(State& board, int& x, int& y) {
@@ -62,7 +63,7 @@ namespace GoBang_AI {
 		for (char y = 0; y < BOARD_SIZE; y++) {
 			for (char x = 0; x < BOARD_SIZE; x++) {
 				if (board(x, y) == 0) continue;
-				char mark = board(x, y) == 1 ? 1 : -1, flag, num;
+				char mark = board(x, y) == board.me ? 1 : -1, flag, num;
 				for (char k = 0; k < 4; k++) {
 					num = judgeLineChess(
 						x, y, 
@@ -86,12 +87,13 @@ namespace GoBang_AI {
 			step_y[] = { 1,-1, 0, 0, 1,-1,-1, 1 };
 		if (newboard.pos != -1)
 			newboard[newboard.pos] = board[newboard.pos];
-		for (char y = (newboard.pos + 1) % BOARD_SIZE; y < BOARD_SIZE; y++) {
-			for (char x = (newboard.pos + 1) / BOARD_SIZE; x < BOARD_SIZE; x++) {
+		for (int y = (newboard.pos + 1) % BOARD_SIZE; y < BOARD_SIZE; y++) {
+			for (int x = (newboard.pos + 1) / BOARD_SIZE; x < BOARD_SIZE; x++) {
+				printf("%d %d %d\n", newboard.pos, x, y);
 				if (board(x, y) != 0) continue;
 				for (int k = 0; k < 8; k++) {
-					char xt = x + step_x[k],
-						 yt = y + step_y[k];
+					int xt = x + step_x[k],
+						yt = y + step_y[k];
 					if (judgeOut(xt, yt) && board(xt, yt) != 0) {
 						newboard(x, y) = newboard.player = -board.player;
 						newboard.pos   = x * BOARD_SIZE + y;
