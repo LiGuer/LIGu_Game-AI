@@ -1,19 +1,15 @@
 /*
-Copyright 2020 LiGuer. All Rights Reserved.
-
+Copyright 2020,2021 LiGuer. All Rights Reserved.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
+	http://www.apache.org/licenses/LICENSE-2.0
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
 #ifndef GO_H
 #define GO_H
 #include<stdio.h>
@@ -90,11 +86,11 @@ public:
 	const int MctsBudget = 100000;
 	const INT8S NOTPOINT = 10;										//禁入点标记//眼点标记 = 禁入点标记+棋子标记
 	const INT8S x_step[4] = { 1,-1,0,0 }, y_step[4] = { 0,0,1,-1 };
-	const double TieZi = 2 * 1.75;										//贴子
+	const double TieZi = 2 * 1.75;									//贴子
 	/*---------------- 基础函数 ----------------*/
 	void init();													//初始化
-	void setMainState() { ; }								//清盘
-	bool setMap(INT8S x, INT8S y, STONE stone);	//下子
+	void setMainState() { ; }										//清盘
+	bool setMap(INT8S x, INT8S y, STONE stone);						//下子
 	bool judgeOutMap(int x, int y);									//判断是否过界
 	void GoAI(INT8S& x, INT8S& y, INT8S stone);
 	/*---------------- [MCTS]核心函数 ----------------*/
@@ -114,7 +110,7 @@ public:
 	bool judgeJie(STONE* map, STONE stone, INT8S x0, INT8S y0,INT8U qi[], INT8U chBlockMap[], INT8S Jie0[]);	//[RULE 3]:劫停一手//判定劫
 	void judgeEye(STONE* map, INT8U qi[], INT8U chBlockMap[]);
 	void judgeEyeAndNot(STONE* map, STONE stone, INT8U qi[], INT8U chBlockMap[]);
-	int judgeWin(State* state);										//[RULE 4]:局势判定(数子法)
+	int  judgeWin(State* state);										//[RULE 4]:局势判定(数子法)
 	/*---------------- 调试函数 ----------------*/
 	void showMap(STONE* map);
 	void showTree(MCTSNode* root);
