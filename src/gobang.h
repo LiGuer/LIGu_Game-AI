@@ -26,7 +26,8 @@ namespace GoBang_AI {
 #define BLACK  1
 #define WHITE -1
 	struct State {
-		char me, player, pos = -1;
+		char me, player;
+		int pos = -1;
 		Mat<CHESS> board{ 15, 15 };
 		CHESS& operator[](int i)		{ return board[i]; }
 		CHESS& operator()(int i, int j) { return board(i, j); }
@@ -79,26 +80,24 @@ namespace GoBang_AI {
 			}
 		}return score;
 	}
-	/*---------------- 棋局分数评价函数 ----------------*/
+	/*---------------- 生成新状态 ----------------*/
 	//默认五子棋连通，不考虑"飞子"
 	bool newStateFunc(State& board, State& newboard) {
 		const static char 
 			step_x[] = { 0, 0, 1,-1, 1,-1, 1,-1 },
 			step_y[] = { 1,-1, 0, 0, 1,-1,-1, 1 };
+		if (newboard.pos == board.pos) newboard.pos = -1;
 		if (newboard.pos != -1)
 			newboard[newboard.pos] = board[newboard.pos];
-		for (int y = (newboard.pos + 1) % BOARD_SIZE; y < BOARD_SIZE; y++) {
-			for (int x = (newboard.pos + 1) / BOARD_SIZE; x < BOARD_SIZE; x++) {
-				printf("%d %d %d\n", newboard.pos, x, y);
-				if (board(x, y) != 0) continue;
-				for (int k = 0; k < 8; k++) {
-					int xt = x + step_x[k],
-						yt = y + step_y[k];
-					if (judgeOut(xt, yt) && board(xt, yt) != 0) {
-						newboard(x, y) = newboard.player = -board.player;
-						newboard.pos   = x * BOARD_SIZE + y;
-						return true;
-					}
+		for (int i = newboard.pos + 1; i < BOARD_SIZE * BOARD_SIZE; i++) {
+			if (board[i] != 0) continue;
+			for (int k = 0; k < 8; k++) {
+				int xt = i / BOARD_SIZE + step_x[k],
+					yt = i % BOARD_SIZE + step_y[k];
+				if (judgeOut(xt, yt) && board(xt, yt) != 0) {
+					newboard[i]  = newboard.player = -board.player;
+					newboard.pos = i;
+					return true;
 				}
 			}
 		}

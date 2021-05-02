@@ -7,7 +7,7 @@ public:
 	int MaxLevel = 5;
 	int  (*Evaluate)		(State&);					//评价函数
 	bool (*newStateFunc)	(State&, State&);			//生成新状态
-	char (*judgeWin)		(State&);					//生成新状态
+	char (*judgeWin)		(State&);					//判断输赢
 	std::vector<int> ansScoreSet;
 	State maxScoreState;
 	/*----------------[ 构造/析构函数 ]----------------*/
@@ -41,6 +41,11 @@ public:
 			int score = Policy(level + 1, newState, alpha, beta);
 			//[3]
 			if (level == 0) {
+				for (char y = 0; y < 15; y++) {
+					for (char x = 0; x < 15; x++) {
+						printf("%d ", newState[x * 15 + y] + 1);
+					}printf("\n");
+				}
 				ansScoreSet.push_back(score);
 				if (score > max) maxScoreState = newState;
 			}
