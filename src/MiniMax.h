@@ -35,23 +35,18 @@ public:
 		int max = -0x7fffffff, 
 			min =  0x7fffffff;
 		//[1]
-		State newState = state;
+		State newState;
 		while (newStateFunc(state, newState)) {
 			//[2]
 			int score = Policy(level + 1, newState, alpha, beta);
 			//[3]
 			if (level == 0) {
-				for (char y = 0; y < 15; y++) {
-					for (char x = 0; x < 15; x++) {
-						printf("%d ", newState[x * 15 + y] + 1);
-					}printf("\n");
-				}
 				ansScoreSet.push_back(score);
 				if (score > max) maxScoreState = newState;
 			}
-			level % 2 == 0 ?
-				max = max >= score ? max : score, alpha = alpha >= score ? alpha : score:
-				min = min <= score ? min : score,  beta =  beta <= score ?  beta : score;
+			if (level % 2 == 0)
+				 max = max >= score ? max : score, alpha = alpha >= score ? alpha : score;
+			else min = min <= score ? min : score,  beta =  beta <= score ?  beta : score;
 			if (alpha >= beta) 
 				return level % 2 == 0 ? max : min;
 		}

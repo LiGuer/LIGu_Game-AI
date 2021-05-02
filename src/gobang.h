@@ -50,10 +50,10 @@ namespace GoBang_AI {
 		run(boardState, x, y);
 	}
 	void run(State& board, int& x, int& y) {
-		MiniMax<State> AI(evaluate, newStateFunc, judgeWin);
+		MiniMax<State> AI(evaluate, newStateFunc, judgeWin, 0);
 		int maxScore = AI.Policy(0, board, -0x7fffffff, 0x7fffffff);
-		x = AI.maxScoreState.pos % BOARD_SIZE;
-		y = AI.maxScoreState.pos / BOARD_SIZE;
+		x = AI.maxScoreState.pos / BOARD_SIZE;
+		y = AI.maxScoreState.pos % BOARD_SIZE;
 	}
 	/*---------------- 棋局分数评价函数 ----------------*/
     int evaluate(State& board) {
@@ -86,9 +86,8 @@ namespace GoBang_AI {
 		const static char 
 			step_x[] = { 0, 0, 1,-1, 1,-1, 1,-1 },
 			step_y[] = { 1,-1, 0, 0, 1,-1,-1, 1 };
-		if (newboard.pos == board.pos) newboard.pos = -1;
-		if (newboard.pos != -1)
-			newboard[newboard.pos] = board[newboard.pos];
+		if  (newboard.pos == -1) { newboard = board; newboard.pos = -1; }
+		else newboard[newboard.pos] = 0;
 		for (int i = newboard.pos + 1; i < BOARD_SIZE * BOARD_SIZE; i++) {
 			if (board[i] != 0) continue;
 			for (int k = 0; k < 8; k++) {
