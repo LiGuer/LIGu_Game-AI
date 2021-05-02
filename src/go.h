@@ -75,7 +75,7 @@ bool newStateRand(State& state, State& newState) {
 }
 /*--------------------------------[ 判断是否过界 ]--------------------------------*/
 bool judgeOut(int x, int y) {
-	return (x >= 0 && x < BOARDSIZE && y >= 0 && y < BOARDSIZE) ? true : false;
+	return (x >= 0 && x < BOARDSIZE && y >= 0 && y < BOARDSIZE) ? false : true;
 }
 /******************************************************************************
 *                   围棋规则函数
@@ -88,15 +88,16 @@ bool downStone(State& state) {
 	//劫判定
 	judgeJie(state);
 	//落子
-	state(state.x, state.y) = state.player;
+	state[state.pos] = state.player;
 	//棋块数气
 	state.qi     ->zero();
 	state.chBlock->zero();
-	ComputerQi(state.board, state.qi, state.chBlock);
+	ComputerQi(*state.board, *state.qi, *state.chBlock);
 	//无气提子
-	for (int x = 0; x < BOARDSIZE * BOARDSIZE; x++)
-		if (state.qi[state.chBlock[x]] == 0 && state.chBlock[x] != state.chBlock[state.y * BOARDSIZE + state.x])
-			state.board[x] = 0;
+	for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++)
+		if ((*state.qi)[(*state.chBlock)[i]] == 0
+		&&  (*state.chBlock)[i] != (*state.chBlock)[state.pos])
+			state[i] = 0;
 	return true;
 }
 /*--------------------------------[ [2]:禁入点标记 ]--------------------------------
@@ -120,8 +121,8 @@ void judgeNotPoint(State& board) {
 				if (judgeOut(xt, yt)) continue;
 				/*---- 核心判断 ----*/
 				if (board(xt, yt) == 0															//上下左右应不为空
-					|| (board(xt, yt) == board.player && board.qi[board.chBlock(xt, yt)] != 1)		//若是我，应只一气
-					|| (board(xt, yt) != board.player && board.qi[board.chBlock(xt, yt)] == 1)) {	//若是敌，应必不只一气
+				|| (board(xt, yt) == board.player && (*board.qi)[(*board.chBlock)(xt, yt)] != 1)	//若是我，应只一气
+				|| (board(xt, yt) != board.player && (*board.qi)[(*board.chBlock)(xt, yt)] == 1)) {	//若是敌，应必不只一气
 					flagMe = 0;
 				}
 			}
@@ -149,7 +150,7 @@ void judgeEye(State& board) {
 					yt = y + y_step[i];
 				if (judgeOut(xt, yt)) continue;
 				who += board(xt, yt);
-				if (board(xt, yt) * who <= 0 || board.qi[board.chBlock(xt, yt)] == 1) {
+				if (board(xt, yt) * who <= 0 || (*board.qi)[(*board.chBlock)(xt, yt)] == 1) {
 					flag = 0; break;
 				}
 			}
@@ -251,7 +252,7 @@ int judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
 *	棋块: 上下左右连通的同一色棋的区域
 *	气:
 **--------------------------------------------------------------------------*/
-void ComputerQi(Mat<STONE>& board, Mat<STONE>& qi, Mat<STONE>& chBlock) {
+void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& chBlock) {
 	const static char
 		x_step[] = { 0, 0, 1,-1, 1,-1, 1,-1 },
 		y_step[] = { 1,-1, 0, 0, 1,-1,-1, 1 };
