@@ -1,5 +1,17 @@
-#ifndef MONTECARLO_SEARCH_TREE
-#define MONTECARLO_SEARCH_TREE
+/*
+Copyright 2020,2021 LiGuer. All Rights Reserved.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+	http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+==============================================================================*/
+#ifndef MONTECARLO_TREE_SEARCH
+#define MONTECARLO_TREE_SEARCH
 #include <vector>
 /******************************************************************************
 *					Montecarlo Search Tree 蒙特卡洛树搜索
@@ -14,7 +26,7 @@
 		[State]的内存管理，只能由其构造,析构函数完成
 ******************************************************************************/
 template<class State>
-class MontecarloSearchTree {
+class MontecarloTreeSearch {
 public:
 	/*--------------------------------[ Montecarlo 树节点 ]--------------------------------*/
 	struct TreeNode {
@@ -22,6 +34,7 @@ public:
 			visitTime = 0;
 		State*    state  = NULL;
 		TreeNode* parent = NULL;
+		bool isChildFull = false;
 		std::vector<TreeNode*> child;
 		// 析构函数
 		~TreeNode() {
@@ -32,10 +45,10 @@ public:
 	};
 	/*--------------------------------[ 核心数据 ]--------------------------------*/
 	const int maxSearchTimes = 100000;
-	State* (*newStateRandFunc)	(State*);					//生成新状态
-	State* (*judgeWin)	        (State*);					//判断输赢
+	bool	(*newStateRandFunc)	(State&, State&);			//生成新状态
+	char	(*judgeWin)	        (State&);					//判断输赢
 	/*--------------------------------[ 构造函数 ]--------------------------------*/
-	MontecarloSearchTree() { ; }
+	MontecarloTreeSearch() { ; }
 	/*----------------------------------------------------------------------------
 				Montecarlo Search Tree
 	*The process of MCTS is split up into four steps:
@@ -67,13 +80,15 @@ public:
 	**----------------------------------------------------------------------------*/
 	TreeNode* TreePolicy(TreeNode* node) {
 		TreeNode* newNode = NULL;
-		while (node != NULL && !judgeWin(node->state)) {
-			if (node->isFullChildFlag) {
+		while ( node != NULL && !judgeWin(node->state)) {
+			if (node->isChildFull) {
 				node = Select(node, true); continue;
 			}
 			if (Expand(node, &newNode))return newNode;		//尝试扩展子节点，若不行，则该点全满
-			node->isFullChildFlag = true;
-			node = Select(node, true);
+			else {
+				node->isChildFull = true;
+				node = Select(node, true);
+			}
 		}
 		return node;
 	}
@@ -114,10 +129,12 @@ public:
 	*	在[node]节点上拓展一个新节点，随机选择下一步Action
 	*	[注]: 需保证新增节点与其他节点Action不同。
 	**----------------------------------------------------------------------------*/
-	bool Expand(TreeNode* node, TreeNode*& newNode, bool(*nextStateRand)(TreeNode*, State*)) {
+	bool Expand(TreeNode* node, TreeNode*& newNode) {
 		/*---- New State ----*/
-		State* newState;
-		if ((newState = nextStateRand(node, state)) != NULL) return false;
+		State* newState = new State;
+		if (nextStateRand(*(node->state), *newState)) {
+			delete newState; return false;
+		}
 		/*---- New Node ----*/
 		newNode = new TreeNode;
 		newNode->state  = newState;
@@ -129,13 +146,13 @@ public:
 	对[node]节点的状态[state]，进行模拟，直到胜利结束。
 	返回该状态模拟的[Reward]奖惩值。
 	**----------------------------------------------------------------------------*/
-	int Simulation(State* state0) {
-		State* newState;
+	int Simulation(State* state) {
+		State* newState = new State;
 		/*---- 开始模拟 ----*/
-		int reward = judgeWin(&state);
-		while ((reward = judgeWin(newState)) == 0) {
-			if ((newState = newStateRandFunc(&state)) != NULL) break;		//随机选择下一动作
-		}
+		int reward = 0;
+		do {
+			if (newStateRandFunc(*state, *newState)) break;		//随机选择下一动作
+		} while ((reward = judgeWin(newState)) == 0)
 		return reward;
 	}
 	/*--------------------------------[ [4]Backpropagation 回溯 ]--------------------------------
