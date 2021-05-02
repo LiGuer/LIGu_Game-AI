@@ -28,9 +28,9 @@ namespace GoBang_AI {
 	struct State {
 		char me, player;
 		int pos = -1;
-		Mat<CHESS> board{ 15, 15 };
-		CHESS& operator[](int i)		{ return board[i]; }
-		CHESS& operator()(int i, int j) { return board(i, j); }
+		Mat<CHESS>* board;
+		CHESS& operator[](int i)		{ return (*board)[i]; }
+		CHESS& operator()(int i, int j) { return (*board)(i, j); }
 	};
 	/*---------------- 函数声明 ----------------*/
 	void run(CHESS* board, int& x, int& y, char who);
@@ -44,13 +44,13 @@ namespace GoBang_AI {
 	void run(CHESS* board, int& x, int& y, char who) {
 		State boardState;
 		Mat<CHESS> boardMat(15, 15);
-		boardState.board.getData(board);
+		boardState.board = &boardMat.getData(board);
 		boardState.player = -who;
 		boardState.me	  =  who;
 		run(boardState, x, y);
 	}
 	void run(State& board, int& x, int& y) {
-		MiniMax<State> AI(evaluate, newStateFunc, judgeWin);
+		MiniMax<State> AI(evaluate, newStateFunc, judgeWin, [](State& x) { x[x.pos] = 0; });
 		int maxScore = AI.Policy(0, board, -0x7fffffff, 0x7fffffff);
 		x = AI.maxScoreState.pos / BOARD_SIZE;
 		y = AI.maxScoreState.pos % BOARD_SIZE;
@@ -88,7 +88,7 @@ namespace GoBang_AI {
 			step_y[] = { 1,-1, 0, 0, 1,-1,-1, 1 };
 		if  (newboard.pos == -1) { newboard = board; newboard.pos = -1; }
 		else newboard[newboard.pos] = 0;
-		for (int i = newboard.pos + 1; i < BOARD_SIZE * BOARD_SIZE; i++) {
+		for (int i =  newboard.pos + 1; i < BOARD_SIZE * BOARD_SIZE; i++) {
 			if (board[i] != 0) continue;
 			for (int k = 0; k < 8; k++) {
 				int xt = i / BOARD_SIZE + step_x[k],

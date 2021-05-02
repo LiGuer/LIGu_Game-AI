@@ -8,14 +8,22 @@ public:
 	int  (*Evaluate)		(State&);					//评价函数
 	bool (*newStateFunc)	(State&, State&);			//生成新状态
 	char (*judgeWin)		(State&);					//判断输赢
+	void (*endingState)	(State&);					//判断输赢
 	std::vector<int> ansScoreSet;
 	State maxScoreState;
 	/*----------------[ 构造/析构函数 ]----------------*/
-	MiniMax(int(*_Evaluate)(State&), bool(*_newStateFunc)(State&, State&), char(*_judgeWin)(State&),int _MaxLevel = 5) {
+	MiniMax(
+		int (*_Evaluate)	(State&), 
+		bool(*_newStateFunc)(State&, State&), 
+		char(*_judgeWin)	(State&),
+		void(*_endingState) (State&),
+		int _MaxLevel = 5
+	) {
 		Evaluate     = _Evaluate;
 		newStateFunc = _newStateFunc;
-		MaxLevel	 = _MaxLevel;
 		judgeWin	 = _judgeWin;
+		endingState  = _endingState;
+		MaxLevel	 = _MaxLevel;
 	}
 	/******************************************************************************
 	*                    决策函数  博弈树
@@ -47,9 +55,9 @@ public:
 			if (level % 2 == 0)
 				 max = max >= score ? max : score, alpha = alpha >= score ? alpha : score;
 			else min = min <= score ? min : score,  beta =  beta <= score ?  beta : score;
-			if (alpha >= beta) 
-				return level % 2 == 0 ? max : min;
+			if (alpha >= beta) break;
 		}
+		endingState(newState);
 		return level % 2 == 0 ? max : min;
 	}
 };
