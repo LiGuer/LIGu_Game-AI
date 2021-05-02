@@ -50,7 +50,7 @@ namespace GoBang_AI {
 		run(boardState, x, y);
 	}
 	void run(State& board, int& x, int& y) {
-		MiniMax<State> AI(evaluate, newStateFunc, judgeWin, [](State& x) { x[x.pos] = 0; });
+		MiniMax<State> AI(evaluate, newStateFunc, judgeWin, [](State& x) { x[x.pos] = 0; }, 4);
 		int maxScore = AI.Policy(0, board, -0x7fffffff, 0x7fffffff);
 		x = AI.maxScoreState.pos / BOARD_SIZE;
 		y = AI.maxScoreState.pos % BOARD_SIZE;

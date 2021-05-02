@@ -8,7 +8,7 @@ public:
 	int  (*Evaluate)		(State&);					//评价函数
 	bool (*newStateFunc)	(State&, State&);			//生成新状态
 	char (*judgeWin)		(State&);					//判断输赢
-	void (*endingState)	(State&);					//判断输赢
+	void (*endingState)		(State&);					//状态收尾处理
 	std::vector<int> ansScoreSet;
 	State maxScoreState;
 	/*----------------[ 构造/析构函数 ]----------------*/
