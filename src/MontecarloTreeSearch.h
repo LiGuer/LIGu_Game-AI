@@ -45,7 +45,7 @@ public:
 	};
 	/*--------------------------------[ 核心数据 ]--------------------------------*/
 	TreeNode root;
-	const int maxSearchTimes = 20000;
+	const int maxSearchTimes = 1E5;
 	bool(*newStateRandFunc)	(State&, State&, bool);			//生成新状态
 	char(*judgeWin)	        (State&);						//判断输赢
 	/*--------------------------------[ 构造/析构函数 ]--------------------------------*/

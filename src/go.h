@@ -45,7 +45,7 @@ struct State {
 ******************************************************************************/
 //函数声明
 void run			(STONE* board, int& x, int& y, STONE who, int& JiePos);
-void run			(State* board, int& pos, int& JiePos);
+void run			(State* board, int& JiePos);
 bool judgeOut(int x, int y);
 bool newStateRand	(State&, State&, bool);
 bool newStateRand	(State& state);
@@ -59,22 +59,23 @@ void run(STONE* board, int& x, int& y, STONE who, int& JiePos) {
 	State* root = new State;
 	root->player = -who;
 	root->board.getData(board);
-	ComputerQi		(root->board, root->qi, root->mark);
-	judgeEyeAndNot	(root->board, root->qi, root->mark, -root->player);
-	if (JIEPOINT != -1)root->board[JiePos] = JIEPOINT;
-	int pos;
-	run(root, pos, JiePos);
-	x = root->board.i2x(pos);
-	y = root->board.i2y(pos);
+	run(root, JiePos);
+	x = root->board.i2x(root->pos);
+	y = root->board.i2y(root->pos);
 }
-void run(State* board, int& pos, int& JiePos) {
+void run(State* board, int& JiePos) {
+	board->qi.  zero();
+	board->mark.zero();
+	ComputerQi		(board->board, board->qi, board->mark);
+	judgeEyeAndNot	(board->board, board->qi, board->mark, -board->player);
+	if (JIEPOINT != -1)board->board[JiePos] = JIEPOINT;
 	typedef MontecarloTreeSearch<State> AI;
 	AI ai(
 		newStateRand,
 		judgeWin
-	);;
+	);
 	State* state = ai.run(board);
-	pos    = state->pos;
+	*board = *state;
 	JiePos = -1;
 	for (int i = 0; i < state->mark.size(); i++)
 		if(state->mark[i] == JIEPOINT) JiePos = i;
@@ -88,13 +89,15 @@ bool newStateRand(State& state, State& newState, bool isSimulation) {
 	newState.board  = state.board;
 	newState.mark   = state.mark;
 	newState.player =-state.player;
+	for (int i = 0; i < newState.mark.size(); i++)
+		if (newState.mark[i] == -40) newState.mark[i] = 0;
 	int num = 0, index;
 	for (int i = 0; i < state.board.size(); i++)
 		if (state.mark [i] == 0 
 		&&  state.board[i] == 0) num++;
 	if (num == 0) 
 		return false;
-	index = rand() % num;
+	index = rand() % num + 1;
 	for (int i = 0; i < state.board.size(); i++) {
 		if (state.mark [i] == 0
 		&&  state.board[i] == 0) index--;
@@ -123,21 +126,6 @@ bool newStateRand(State& state) {
 		}
 	}
 	downStone(state);
-	for (char y = 0; y < 9; y++) {
-		for (char x = 0; x < 9; x++) {
-			printf("%c ", state.board[x * 9 + y] == 0 ? '+' : (state.board[x * 9 + y] == 1 ? 'x' : 'o'));
-		}printf("\n");
-	}
-	for (char y = 0; y < 9; y++) {
-		for (char x = 0; x < 9; x++) {
-			printf("%3d ", state.mark[x * 9 + y]);
-		}printf("\n");
-	}
-	for (char y = 0; y < 9; y++) {
-		for (char x = 0; x < 9; x++) {
-			printf("%2d ", state.qi[x * 9 + y]);
-		}printf("\n");
-	}
 	return true;
 }
 /*--------------------------------[ 判断是否过界 ]--------------------------------*/
@@ -152,7 +140,7 @@ bool judgeOut(int x, int y) {
 [RULE 1]:无气提子
 [RULE 3]:劫判定
 **-------------------------------------------------------------------------------*/
-bool downStone(State& state) {
+static bool downStone(State& state) {
 	//劫判定
 	int JiePos = judgeJie(state.board, state.qi, state.mark, state.pos, state.player);
 	//落子
@@ -191,24 +179,24 @@ bool downStone(State& state) {
 *	禁入点: [1]我无气	[2]非杀他
 *	禁入点判定: [1]上下左右若是我，只一气；若是敌，必不只一气；上下左右不为空
 **------------------------------------------------------------------------------*/
-void judgeEyeAndNot(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, STONE player) {
+static void judgeEyeAndNot(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, STONE player) {
 	const static int
 		x_step[] = { 0, 0, 1,-1, 1,-1, 1,-1 },
 		y_step[] = { 1,-1, 0, 0, 1,-1,-1, 1 };
 	for (int i = 0; i < board.size(); i++) {
 		if (board[i] != 0) continue;
-		int  flagEye = 1;
+		int  flagEye = 0x7FFFFFFF;
 		bool flagNot = 1;
 		for (int j = 0; j < 4; j++) {
 			int xt = board.i2x(i) + x_step[j],
 				yt = board.i2y(i) + y_step[j];
 			if (judgeOut(xt, yt)) continue;
 			//核心判断
-			if (j == 0) flagEye = board(xt, yt);
-			if (board(xt, yt) != flagEye|| qi[mark(xt, yt)] == 1) { flagEye = 0; }
-			if (board(xt, yt) == 0															//上下左右应不为空
-			|| (board(xt, yt) == player && qi[mark(xt, yt)] != 1)							//若是我，应只一气
-			|| (board(xt, yt) != player && qi[mark(xt, yt)] == 1)){ flagNot = 0; }			//若是敌，应必不只一气
+			if (flagEye == 0x7FFFFFFF) flagEye = board(xt, yt);
+			if (board(xt, yt) != flagEye|| qi[mark(xt, yt)] == 1) { flagEye = 0; }	//同一色，且均非一气
+			if (board(xt, yt) == 0													//上下左右应不为空
+			|| (board(xt, yt) == player && qi[mark(xt, yt)] != 1)					//若是我，应只一气
+			|| (board(xt, yt) != player && qi[mark(xt, yt)] == 1)){ flagNot = 0; }	//若是敌，应必不只一气
 		}
 		if (flagEye) mark[i] = EYEPOINT + (flagEye > 0 ? 1 : -1);
 		else 
@@ -224,57 +212,51 @@ void judgeEyeAndNot(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, STONE playe
 			x o @ x		x o @ x
 *	*判定: [1] 四周全敌 [2] 有且只有一方，只一气，且只一点
 **------------------------------------------------------------------------*/
-int judgeJie(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, int pos, STONE player) {
+static int judgeJie(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, int pos, STONE player) {
 	const static int
 		x_step[] = { 0, 0, 1,-1, 1,-1, 1,-1 },
 		y_step[] = { 1,-1, 0, 0, 1,-1,-1, 1 };
 	int  JiePos  =-1;
-	bool JieFlag = 1, 
-		 JieArmy = 0;
+	bool JieArmy = 0;
 	int x0 = board.i2x(pos),
 		y0 = board.i2y(pos);
 	for (int i = 0; i < 4; i++) {
 		int xt = x0 + x_step[i],
 			yt = y0 + y_step[i];
-		if (judgeOut(xt, yt)) continue;						//过界
+		if (judgeOut(xt, yt)) continue;
 		if (board(xt, yt) == 0
-		||  board(xt, yt) == player) {				//四周非全敌，非劫
-			JieFlag = 0; break;
-		}
-		if (qi[mark(xt, yt)] == 1) {						//是敌且只1气
-			if  (JieArmy == 1) { JieFlag = 0; break; }		//有两个1气敌，非劫
+		||  board(xt, yt) == player) return -1;				//四周非全敌，非劫
+		if (qi[mark(xt, yt)] == 1) {						//是敌且只一气
+			if  (JieArmy == 1) return -1;					//有两个一气敌，非劫
 			else JieArmy =  1;
 			for (int j = 0; j < 4; j++) {					//1气敌只有自己
 				int xtt = xt + x_step[j],
 					ytt = yt + y_step[j];
 				if (judgeOut(xtt, ytt)
 				|| (ytt == y0 && xtt == x0)) continue;
-				if (board(xtt, ytt) != player) { 
-					JieFlag = 0; 
-					JieArmy = 0; 
-					break; 
-				}
+				if (board(xtt, ytt) != player) return -1;
 			}
-			if (JieArmy) { JiePos = board.xy2i(xt, yt); JieFlag = 1; }
+			JiePos = board.xy2i(xt, yt); 
 		}
 	}
-	return JieFlag ? true : JiePos = -1, false;
+	return JiePos;
 }
 /*--------------------------------[ [4]:输赢判定(数子法) ]--------------------------------
 *	[RULE 4]:局势判定(数子法)
 *	无气杀我非杀他，为禁入
 **----------------------------------------------------------------------------------------*/
-char judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
-	double ScoreBlack = 0,
-		   ScoreWhite = 0;
+static char judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
+	int ScoreBlack = 0,
+		ScoreWhite = 0;
 	for (int i = 0; i < state.board.size(); i++) {
-		if		(state.mark [i] == 0)					return 0;
+		if		(state.mark [i] == 0|| state.mark[i] == -40)	return 0;
 		else if (state.board[i] == BLACK)				ScoreBlack++;
-		else if (state.board[i] == WHITE)				ScoreWhite++;
+		else if (state.board[i] 
+			== WHITE)				ScoreWhite++;
 		else if (state.mark [i] == EYEPOINT + BLACK)	ScoreBlack++;
 		else if (state.mark [i] == EYEPOINT + WHITE)	ScoreWhite++;
 	}
-	return ScoreBlack - 2.5 > ScoreWhite ? 1 : -1;		//贴子
+	return ScoreBlack > ScoreWhite ? 1 : -1;		//贴子
 }
 /*--------------------------------[ 棋块数气 ]--------------------------------
 *	*输入: [1] 棋盘board
@@ -282,7 +264,7 @@ char judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
 *	棋块: 上下左右连通的同一色棋的区域
 *	气:
 **--------------------------------------------------------------------------*/
-void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark) {
+static void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark) {
 	//棋块标记
 	int markCur = 1;
 	int HeadStoneFlag[BOARDSIZE * BOARDSIZE] = { 0 };			//并查集头节点标记
