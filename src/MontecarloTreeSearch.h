@@ -46,15 +46,12 @@ public:
 	/*--------------------------------[ 核心数据 ]--------------------------------*/
 	const int maxSearchTimes = 100000;
 	bool	(*newStateRandFunc)	(State&, State&);			//生成新状态
-	bool	(*newStateRandFunc)	(State&);					//生成新状态
 	char	(*judgeWin)	        (State&);					//判断输赢
 	/*--------------------------------[ 构造函数 ]--------------------------------*/
 	MontecarloTreeSearch(
 		bool	(*_newStateRandFunc)	(State&, State&),
-		bool	(*_newStateRandFunc)	(State&),
 		char	(*_judgeWin)	        (State&),
 	) :
-		newStateRandFunc(_newStateRandFunc),
 		newStateRandFunc(_newStateRandFunc),
 		_judgeWin		(_judgeWin)
 	{ ; }
@@ -161,7 +158,7 @@ public:
 		/*---- 开始模拟 ----*/
 		int reward = 0;
 		while ((reward = judgeWin(newState)) == 0) {
-			if (newStateRandFunc(*newState)) break;				//随机选择下一动作
+			if (newStateRandFunc(*newState, *newState)) break;
 		} 
 		delete newState;
 		return reward;
