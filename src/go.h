@@ -35,8 +35,8 @@ struct State {
 	int  pos = -1;
 	char player = 0;
 	Mat<STONE> board{ BOARDSIZE , BOARDSIZE };
-	Mat<int>   mark { BOARDSIZE , BOARDSIZE };
-	Mat<int>   qi	{ BOARDSIZE * BOARDSIZE };
+	Mat<int>   mark { BOARDSIZE , BOARDSIZE },
+			   qi	{ BOARDSIZE * BOARDSIZE };
 	STONE& operator[](int i)		{ return board[i]; }
 	STONE& operator()(int i, int j) { return board(i, j); }
 };
@@ -44,8 +44,8 @@ struct State {
 *                    基础函数
 ******************************************************************************/
 //函数声明
-void  run(STONE* board, int& x, int& y, STONE who, int& JiePos);
-void  run(State& board, int& pos, int& JiePos);
+void run(STONE* board, int& x, int& y, STONE who, int& JiePos);
+void run(State& board, int& pos, int& JiePos);
 bool judgeOut(int x, int y);
 bool newStateRand(State&, State&, bool);
 bool newStateRand(State& state);
@@ -182,7 +182,7 @@ void judgeEyeAndNot(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, STONE playe
 	for (int i = 0; i < board.size(); i++) {
 		if (board[i] != 0) continue;
 		bool flagEye = 1, 
-				flagNot = 1;
+			 flagNot = 1;
 		for (int j = 0; j < 4; j++) {
 			int xt = board.i2x(i) + x_step[j],
 				yt = board.i2y(i) + y_step[j];

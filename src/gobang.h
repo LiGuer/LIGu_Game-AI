@@ -52,8 +52,8 @@ namespace GoBang_AI {
 	void run(State& board, int& x, int& y) {
 		MiniMax<State> AI(evaluate, newStateFunc, judgeWin, [](State& x) { x[x.pos] = 0; }, 4);
 		int maxScore = AI.Policy(0, board, -0x7fffffff, 0x7fffffff);
-		x = AI.maxScoreState.pos / BOARD_SIZE;
-		y = AI.maxScoreState.pos % BOARD_SIZE;
+		x = board.board->i2x(AI.maxScoreState.pos);
+		y = board.board->i2y(AI.maxScoreState.pos);
 	}
 	/*---------------- 棋局分数评价函数 ----------------*/
     int evaluate(State& board) {
@@ -88,11 +88,11 @@ namespace GoBang_AI {
 			step_y[] = { 1,-1, 0, 0, 1,-1,-1, 1 };
 		if  (newboard.pos == -1) { newboard = board; newboard.pos = -1; }
 		else newboard[newboard.pos] = 0;
-		for (int i =  newboard.pos + 1; i < BOARD_SIZE * BOARD_SIZE; i++) {
+		for (int i =  newboard.pos + 1; i < board.board->size(); i++) {
 			if (board[i] != 0) continue;
 			for (int k = 0; k < 8; k++) {
-				int xt = i / BOARD_SIZE + step_x[k],
-					yt = i % BOARD_SIZE + step_y[k];
+				int xt = board.board->i2x(i) + step_x[k],
+					yt = board.board->i2y(i) + step_y[k];
 				if (judgeOut(xt, yt) && board(xt, yt) != 0) {
 					newboard[i]  = newboard.player = -board.player;
 					newboard.pos = i;
