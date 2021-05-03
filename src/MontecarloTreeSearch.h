@@ -50,7 +50,7 @@ public:
 				[3]随机生成新状态函数指针	[4]判断输赢函数指针
 	--------------------------------------------------------------------------------*/
 	TreeNode root;
-	const int maxSearchTimes = 1E5;
+	int maxSearchTimes = 1E5;
 	bool(*newStateRandFunc)	(State&, State&, bool);			//随机生成新状态
 	char(*judgeWin)	        (State&);						//判断输赢
 	/*--------------------------------------------------------------------------------
@@ -61,10 +61,12 @@ public:
 	--------------------------------------------------------------------------------*/
 	MontecarloTreeSearch(
 		bool(*_newStateRandFunc)(State&, State&, bool),
-		char(*_judgeWin)		(State&)
+		char(*_judgeWin)		(State&),
+		int _maxSearchTimes = 1E5
 	) :
 		newStateRandFunc(_newStateRandFunc),
-		judgeWin		(_judgeWin)
+		judgeWin		(_judgeWin),
+		maxSearchTimes	(_maxSearchTimes)
 	{ ; }
 	/*--------------------------------------------------------------------------------
 				Montecarlo Search Tree
