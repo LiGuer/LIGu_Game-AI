@@ -38,16 +38,17 @@ public:
 		std::vector<TreeNode*> child;
 		// 析构函数
 		~TreeNode() {
-			delete state;
+			//delete state;
 			for (int i = 0; i < child.size(); i++)
 				delete child[i];
 		}
 	};
 	/*--------------------------------[ 核心数据 ]--------------------------------*/
+	TreeNode root;
 	const int maxSearchTimes = 100000;
 	bool(*newStateRandFunc)	(State&, State&, bool);			//生成新状态
 	char(*judgeWin)	        (State&);						//判断输赢
-	/*--------------------------------[ 构造函数 ]--------------------------------*/
+	/*--------------------------------[ 构造/析构函数 ]--------------------------------*/
 	MontecarloTreeSearch(
 		bool(*_newStateRandFunc)(State&, State&, bool),
 		char(*_judgeWin)		(State&)
@@ -64,7 +65,6 @@ public:
 		[4] backpropagation.
 	*---------------------------------------------------------------------------*/
 	State* run(State* state) {
-		TreeNode root; 
 		root.state = state;
 		for (int i = 0; i < maxSearchTimes; i++) {
 			TreeNode* expandNode = TreePolicy(&root);		//[1][2]
@@ -136,14 +136,14 @@ public:
 	*	[注]: 需保证新增节点与其他节点Action不同。
 	**----------------------------------------------------------------------------*/
 	bool Expand(TreeNode* node, TreeNode*& newNode) {
-		/*---- New State ----*/
+		//New State
 		State* newState = new State;
-		if (newStateRandFunc(*(node->state), *newState, false)) {
+		if (!newStateRandFunc(*(node->state), *newState, false)) {
 			delete newState; return false;
 		}
-		/*---- New Node ----*/
+		//New Node
 		newNode = new TreeNode;
-		newNode->state  = newState;
+		newNode->state  = newState; newState = NULL;
 		newNode->parent = node;
 		node   ->child.push_back(newNode);
 		return true;
@@ -158,8 +158,8 @@ public:
 		/*---- 开始模拟 ----*/
 		int reward = 0;
 		while ((reward = judgeWin(*newState)) == 0) {
-			if (newStateRandFunc(*newState, *newState, true)) break;
-		} 
+			if (!newStateRandFunc(*newState, *newState, true)) break;
+		}
 		delete newState;
 		return reward;
 	}

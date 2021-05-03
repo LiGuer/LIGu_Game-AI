@@ -45,7 +45,7 @@ struct State {
 ******************************************************************************/
 //函数声明
 void run(STONE* board, int& x, int& y, STONE who, int& JiePos);
-void run(State& board, int& pos, int& JiePos);
+void run(State* board, int& pos, int& JiePos);
 bool judgeOut(int x, int y);
 bool newStateRand(State&, State&, bool);
 bool newStateRand(State& state);
@@ -56,24 +56,25 @@ int  judgeJie	(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, int pos, STONE p
 void judgeEyeAndNot(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, STONE player);
 /*--------------------------------[ 下子 ]--------------------------------*/
 void run(STONE* board, int& x, int& y, STONE who, int& JiePos) {
-	State root;
-	root.player = -who;
-	root.board.getData(board);
-	ComputerQi(root.board, root.qi, root.mark);
-	judgeEyeAndNot(root.board, root.qi, root.mark, root.player);
-	if (JIEPOINT != -1)root.board[JiePos] = JIEPOINT;
+	State* root = new State;
+	root->player = -who;
+	root->board.getData(board);
+	ComputerQi(root->board, root->qi, root->mark);
+	judgeEyeAndNot(root->board, root->qi, root->mark, root->player);
+	if (JIEPOINT != -1)root->board[JiePos] = JIEPOINT;
 	int pos;
 	run(root, pos, JiePos);
-	x = root.board.i2x(pos);
-	y = root.board.i2y(pos);
+	printf("<>");
+	x = root->board.i2x(pos);
+	y = root->board.i2y(pos);
 }
-void run(State& board, int& pos, int& JiePos) {
+void run(State* board, int& pos, int& JiePos) {
 	typedef MontecarloTreeSearch<State> AI;
 	AI ai(
 		newStateRand,
 		judgeWin
-	);
-	State* state = ai.run(&board);
+	);;
+	State* state = ai.run(board);
 	pos    = state->pos;
 	JiePos = -1;
 	for (int i = 0; i < state->mark.size(); i++)
@@ -114,7 +115,7 @@ bool newStateRand(State& state) {
 		&&  state.board[i] == 0) num++;
 	if (num == 0) 
 		return false;
-	index = rand() % num;
+	index = rand() % num + 1;
 	for (int i = 0; i < state.board.size(); i++) {
 		if (state.mark [i] == 0
 		&&  state.board[i] == 0) index--;
@@ -143,12 +144,13 @@ bool downStone(State& state) {
 	//落子
 	state[state.pos] = state.player;
 	state.mark.zero();
+	state.qi  .zero();
 	//棋块数气
 	ComputerQi(state.board, state.qi, state.mark);
 	//无气提子
 	for (int i = 0; i < state.board.size(); i++)
 		if (state.qi[state.mark[i]] == 0
-		&&  state.mark[i] != state.mark[state.pos]) {
+		&&  state.mark [i] != state.mark[state.pos]) {
 			state.board[i] = 0;
 			state.mark [i] = 0;
 		}
@@ -252,7 +254,7 @@ char judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
 	double ScoreBlack = 0,
 		   ScoreWhite = 0;
 	for (int i = 0; i < state.board.size(); i++) {
-		if		(state.board[i] == 0)					return 0;
+		if		(state.mark [i] == 0)					return 0;
 		else if (state.board[i] == BLACK)				ScoreBlack++;
 		else if (state.board[i] == WHITE)				ScoreWhite++;
 		else if (state.mark [i] == EYEPOINT + BLACK)	ScoreBlack++;
