@@ -138,7 +138,7 @@ public:
 	bool Expand(TreeNode* node, TreeNode*& newNode) {
 		/*---- New State ----*/
 		State* newState = new State;
-		if (nextStateRand(*(node->state), *newState)) {
+		if (nextStateRand(*(node->state), *newState, false)) {
 			delete newState; return false;
 		}
 		/*---- New Node ----*/
@@ -158,7 +158,7 @@ public:
 		/*---- ¿ªÊ¼Ä£Äâ ----*/
 		int reward = 0;
 		while ((reward = judgeWin(newState)) == 0) {
-			if (newStateRandFunc(*newState, *newState)) break;
+			if (newStateRandFunc(*newState, *newState, true)) break;
 		} 
 		delete newState;
 		return reward;
