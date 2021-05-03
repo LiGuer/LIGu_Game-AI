@@ -67,14 +67,14 @@ public:
 		TreeNode root; 
 		root.state = state;
 		for (int i = 0; i < maxSearchTimes; i++) {
-			TreeNode* expandNode = TreePolicy(root);		//[1][2]
+			TreeNode* expandNode = TreePolicy(&root);		//[1][2]
 			if (expandNode == NULL) break;
 			Backpropagation(								//[4]
 				expandNode, 
 				Simulation(expandNode->state)				//[3]
 			);
 		}
-		return Select(root, false).state;					//Ans
+		return Select(&root, false)->state;					//Ans
 	}
 	/*------------------------------------------------------------------------------
 						TreePolicy
@@ -86,11 +86,11 @@ public:
 	**----------------------------------------------------------------------------*/
 	TreeNode* TreePolicy(TreeNode* node) {
 		TreeNode* newNode = NULL;
-		while ( node != NULL && !judgeWin(node->state)) {
+		while ( node != NULL && !judgeWin(*node->state)) {
 			if (node->isChildFull) {
 				node = Select(node, true); continue;
 			}
-			if (Expand(node, &newNode))return newNode;		//尝试扩展子节点，若不行，则该点全满
+			if (Expand(node, newNode))return newNode;		//尝试扩展子节点，若不行，则该点全满
 			else {
 				node->isChildFull = true;
 				node = Select(node, true);
@@ -138,14 +138,14 @@ public:
 	bool Expand(TreeNode* node, TreeNode*& newNode) {
 		/*---- New State ----*/
 		State* newState = new State;
-		if (nextStateRand(*(node->state), *newState, false)) {
+		if (newStateRandFunc(*(node->state), *newState, false)) {
 			delete newState; return false;
 		}
 		/*---- New Node ----*/
 		newNode = new TreeNode;
 		newNode->state  = newState;
 		newNode->parent = node;
-		node   ->child.push_back(*newNode);
+		node   ->child.push_back(newNode);
 		return true;
 	}
 	/*--------------------------------[ [3]Simulation 模拟 ]--------------------------------
@@ -157,7 +157,7 @@ public:
 		(*newState) = (*state);
 		/*---- 开始模拟 ----*/
 		int reward = 0;
-		while ((reward = judgeWin(newState)) == 0) {
+		while ((reward = judgeWin(*newState)) == 0) {
 			if (newStateRandFunc(*newState, *newState, true)) break;
 		} 
 		delete newState;
