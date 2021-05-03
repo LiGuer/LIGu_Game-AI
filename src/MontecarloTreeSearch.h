@@ -45,7 +45,7 @@ public:
 	};
 	/*--------------------------------[ 核心数据 ]--------------------------------*/
 	TreeNode root;
-	const int maxSearchTimes = 100000;
+	const int maxSearchTimes = 20000;
 	bool(*newStateRandFunc)	(State&, State&, bool);			//生成新状态
 	char(*judgeWin)	        (State&);						//判断输赢
 	/*--------------------------------[ 构造/析构函数 ]--------------------------------*/
@@ -143,7 +143,7 @@ public:
 		}
 		//New Node
 		newNode = new TreeNode;
-		newNode->state  = newState; newState = NULL;
+		newNode->state  = newState;
 		newNode->parent = node;
 		node   ->child.push_back(newNode);
 		return true;
@@ -157,9 +157,9 @@ public:
 		(*newState) = (*state);
 		/*---- 开始模拟 ----*/
 		int reward = 0;
-		while ((reward = judgeWin(*newState)) == 0) {
-			if (!newStateRandFunc(*newState, *newState, true)) break;
-		}
+		while ((reward = judgeWin(*newState)) == 0) 
+			if (!newStateRandFunc(*newState, *newState, true))
+				break;
 		delete newState;
 		return reward;
 	}

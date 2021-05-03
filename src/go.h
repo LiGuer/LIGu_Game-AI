@@ -38,33 +38,32 @@ struct State {
 	Mat<int>   mark { BOARDSIZE , BOARDSIZE },
 			   qi	{ BOARDSIZE * BOARDSIZE };
 	STONE& operator[](int i)		{ return board[i]; }
-	STONE& operator()(int i, int j) { return board(i, j); }
+	STONE& operator()(int x, int y) { return board(x, y); }
 };
 /******************************************************************************
 *                    基础函数
 ******************************************************************************/
 //函数声明
-void run(STONE* board, int& x, int& y, STONE who, int& JiePos);
-void run(State* board, int& pos, int& JiePos);
+void run			(STONE* board, int& x, int& y, STONE who, int& JiePos);
+void run			(State* board, int& pos, int& JiePos);
 bool judgeOut(int x, int y);
-bool newStateRand(State&, State&, bool);
-bool newStateRand(State& state);
-bool downStone	(State& state);
-void ComputerQi	(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark);
-char judgeWin	(State& state);
-int  judgeJie	(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, int pos, STONE player);
-void judgeEyeAndNot(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, STONE player);
+bool newStateRand	(State&, State&, bool);
+bool newStateRand	(State& state);
+bool downStone		(State& state);
+char judgeWin		(State& state);
+void ComputerQi		(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark);
+void judgeEyeAndNot	(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, STONE player);
+int  judgeJie		(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, int pos, STONE player);
 /*--------------------------------[ 下子 ]--------------------------------*/
 void run(STONE* board, int& x, int& y, STONE who, int& JiePos) {
 	State* root = new State;
 	root->player = -who;
 	root->board.getData(board);
-	ComputerQi(root->board, root->qi, root->mark);
-	judgeEyeAndNot(root->board, root->qi, root->mark, root->player);
+	ComputerQi		(root->board, root->qi, root->mark);
+	judgeEyeAndNot	(root->board, root->qi, root->mark, -root->player);
 	if (JIEPOINT != -1)root->board[JiePos] = JIEPOINT;
 	int pos;
 	run(root, pos, JiePos);
-	printf("<>");
 	x = root->board.i2x(pos);
 	y = root->board.i2y(pos);
 }
@@ -104,7 +103,7 @@ bool newStateRand(State& state, State& newState, bool isSimulation) {
 		}
 	}
 	downStone(newState);
-	state.mark[newState.pos] = 40;
+	state.mark[newState.pos] = -40;
 	return true;
 }
 bool newStateRand(State& state) {
@@ -124,6 +123,21 @@ bool newStateRand(State& state) {
 		}
 	}
 	downStone(state);
+	for (char y = 0; y < 9; y++) {
+		for (char x = 0; x < 9; x++) {
+			printf("%c ", state.board[x * 9 + y] == 0 ? '+' : (state.board[x * 9 + y] == 1 ? 'x' : 'o'));
+		}printf("\n");
+	}
+	for (char y = 0; y < 9; y++) {
+		for (char x = 0; x < 9; x++) {
+			printf("%3d ", state.mark[x * 9 + y]);
+		}printf("\n");
+	}
+	for (char y = 0; y < 9; y++) {
+		for (char x = 0; x < 9; x++) {
+			printf("%2d ", state.qi[x * 9 + y]);
+		}printf("\n");
+	}
 	return true;
 }
 /*--------------------------------[ 判断是否过界 ]--------------------------------*/
@@ -171,7 +185,7 @@ bool downStone(State& state) {
 ------
 *	眼点: 敌方禁入点，且上下左右皆为我
 		我方眼点->敌方禁入点，敌方禁入点-/>我方眼点
-*	*判定: [1] 只一空点	[2] 上下左右同一色	[3]上下左右棋块，均非一气
+*	*判定: [1] 只一空点	[2] 上下左右同一色，且均非一气
 ------
 *	[RULE 2]:非提禁入
 *	禁入点: [1]我无气	[2]非杀他
@@ -183,21 +197,21 @@ void judgeEyeAndNot(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, STONE playe
 		y_step[] = { 1,-1, 0, 0, 1,-1,-1, 1 };
 	for (int i = 0; i < board.size(); i++) {
 		if (board[i] != 0) continue;
-		bool flagEye = 1, 
-			 flagNot = 1;
+		int  flagEye = 1;
+		bool flagNot = 1;
 		for (int j = 0; j < 4; j++) {
 			int xt = board.i2x(i) + x_step[j],
 				yt = board.i2y(i) + y_step[j];
 			if (judgeOut(xt, yt)) continue;
 			//核心判断
-			if (board(xt, yt) != player || qi[mark(xt, yt)] == 1) { flagEye = 0; }
+			if (j == 0) flagEye = board(xt, yt);
+			if (board(xt, yt) != flagEye|| qi[mark(xt, yt)] == 1) { flagEye = 0; }
 			if (board(xt, yt) == 0															//上下左右应不为空
-			|| (board(xt, yt) == player && qi[mark(xt, yt)] != 1)		//若是我，应只一气
-			|| (board(xt, yt) != player && qi[mark(xt, yt)] == 1)) {	//若是敌，应必不只一气
-				flagNot = 0;
-			}
+			|| (board(xt, yt) == player && qi[mark(xt, yt)] != 1)							//若是我，应只一气
+			|| (board(xt, yt) != player && qi[mark(xt, yt)] == 1)){ flagNot = 0; }			//若是敌，应必不只一气
 		}
-		if (flagEye) mark[i] = EYEPOINT + player;
+		if (flagEye) mark[i] = EYEPOINT + (flagEye > 0 ? 1 : -1);
+		else 
 		if (flagNot) mark[i] = NOTPOINT;
 	}
 }
