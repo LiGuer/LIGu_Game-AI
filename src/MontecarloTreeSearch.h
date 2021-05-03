@@ -46,6 +46,7 @@ public:
 	/*--------------------------------[ 核心数据 ]--------------------------------*/
 	const int maxSearchTimes = 100000;
 	bool	(*newStateRandFunc)	(State&, State&);			//生成新状态
+	bool	(*newStateRandFunc)	(State&);					//生成新状态
 	char	(*judgeWin)	        (State&);					//判断输赢
 	/*--------------------------------[ 构造函数 ]--------------------------------*/
 	MontecarloTreeSearch() { ; }
@@ -57,7 +58,7 @@ public:
 		[3] simulation,
 		[4] backpropagation.
 	*---------------------------------------------------------------------------*/
-	TreeNode* run(State* state) {
+	State* run(State* state) {
 		TreeNode root; 
 		root.state = state;
 		for (int i = 0; i < maxSearchTimes; i++) {
@@ -68,7 +69,7 @@ public:
 				Simulation(expandNode->state)				//[3]
 			);
 		}
-		return Select(root, false);							//Ans
+		return Select(root, false).state;					//Ans
 	}
 	/*------------------------------------------------------------------------------
 						TreePolicy
@@ -148,11 +149,13 @@ public:
 	**----------------------------------------------------------------------------*/
 	int Simulation(State* state) {
 		State* newState = new State;
+		(*newState) = (*state);
 		/*---- 开始模拟 ----*/
 		int reward = 0;
-		do {
-			if (newStateRandFunc(*state, *newState)) break;		//随机选择下一动作
-		} while ((reward = judgeWin(newState)) == 0)
+		while ((reward = judgeWin(newState)) == 0) {
+			if (newStateRandFunc(*newState)) break;				//随机选择下一动作
+		} 
+		delete newState;
 		return reward;
 	}
 	/*--------------------------------[ [4]Backpropagation 回溯 ]--------------------------------
