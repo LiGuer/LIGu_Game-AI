@@ -47,6 +47,8 @@ namespace Go_AI {
 typedef char STONE;
 /******************************************************************************
 *                    状态
+*	[数据]: [1]下子位置		[2]棋手
+			[3]棋盘			[4]标记棋盘		[5]气标记
 ******************************************************************************/
 struct State {
 	int  pos = -1;
@@ -71,7 +73,7 @@ char judgeWin		(State& state);
 void ComputerQi		(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark);
 void judgeEyeAndNot	(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, STONE player);
 int  judgeJie		(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, int pos, STONE player);
-/*--------------------------------[ 下子 ]--------------------------------*/
+/*--------------------------------[ 运行 ]--------------------------------*/
 void run(STONE* board, int& x, int& y, STONE who, int& JiePos) {
 	State* root = new State;
 	root->player = -who;
@@ -96,10 +98,15 @@ void run(State* board, int& JiePos) {
 	for (int i = 0; i < board->mark.size(); i++)
 		if(board->mark[i] == JIEPOINT) JiePos = i;
 }
-/*--------------------------------[ nextStateRand ]--------------------------------
-基于输入[board]棋盘，在可能的动作下，随机选择一个动作
-*	* [a,b)随机整数: (rand() % (b-a))+ a;
-**----------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------
+						随机新状态生成 New State Rand
+*	[算法]: 基于输入[棋盘]，在可能的动作下，随机选择一个动作
+*	[流程]: 
+		[1] 确认状态空间数量
+			[1.1] 若数量为零, 返回失败
+		[2] 随机选择一个状态, 并返回
+--------------------------------------------------------------------------------*/
+// 用于Montecarlo[2. 拓展]
 bool newStateRand(State& state, State& newState, bool isSimulation) {
 	if (isSimulation) return newStateRand(state);
 	newState.board  = state.board;
@@ -107,13 +114,15 @@ bool newStateRand(State& state, State& newState, bool isSimulation) {
 	newState.player =-state.player;
 	for (int i = 0; i < newState.mark.size(); i++)
 		if (newState.mark[i] == -40) newState.mark[i] = 0;
-	int num = 0, index;
+	//[1]
+	int num = 0;
 	for (int i = 0; i < state.board.size(); i++)
 		if (state.mark [i] == 0 
 		&&  state.board[i] == 0) num++;
 	if (num == 0) 
 		return false;
-	index = rand() % num + 1;
+	//[2]
+	int index = rand() % num + 1;
 	for (int i = 0; i < state.board.size(); i++) {
 		if (state.mark [i] == 0
 		&&  state.board[i] == 0) index--;
@@ -125,15 +134,18 @@ bool newStateRand(State& state, State& newState, bool isSimulation) {
 	state.mark[newState.pos] = -40;
 	return true;
 }
+// 用于Montecarlo[3. 模拟]
 bool newStateRand(State& state) {
 	state.player = -state.player;
-	int num = 0, index;
+	//[1]
+	int num = 0;
 	for (int i = 0; i < state.board.size(); i++)
 		if (state.mark [i] == 0 
 		&&  state.board[i] == 0) num++;
 	if (num == 0) 
 		return false;
-	index = rand() % num + 1;
+	//[2]
+	int index = rand() % num + 1;
 	for (int i = 0; i < state.board.size(); i++) {
 		if (state.mark [i] == 0
 		&&  state.board[i] == 0) index--;
@@ -153,8 +165,15 @@ bool judgeOut(int x, int y) {
 *                   围棋规则函数
 ******************************************************************************/
 /*--------------------------------[ [1]:落子提子 ]--------------------------------
-[RULE 1]:无气提子
-[RULE 3]:劫判定
+*	[算法]:
+		[RULE 1]:无气提子
+		[RULE 3]:劫判定
+*	[流程]:
+		[1] 劫判定
+		[2] 落子
+		[3] 棋块数气
+		[4] 无气提子
+		[5] 眼点禁入点劫点标记 (帮下一回标记)
 **-------------------------------------------------------------------------------*/
 static bool downStone(State& state) {
 	//劫判定
@@ -172,7 +191,7 @@ static bool downStone(State& state) {
 			state.board[i] = 0;
 			state.mark [i] = 0;
 		}
-	//禁入点标记 (帮下一回标记)
+	//眼点禁入点劫点标记 (帮下一回标记)
 	judgeEyeAndNot(state.board, state.qi, state.mark, -state.player);
 	if (JiePos != -1)state.mark[JiePos] = JIEPOINT;
 	return true;
@@ -220,13 +239,13 @@ static void judgeEyeAndNot(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, STON
 	}
 }
 /*--------------------------------[ 劫判定 ]--------------------------------
-*	*输入: [1] 棋盘board	[2] 己方颜色	[3]预期落子点	[4] 气	[5] 棋块
-*	*输出: [1] 是否为劫	[2]对应劫点
-*	劫: 只有一种模式: 黑白眼相交错。
+*	[输入]: [1] 棋盘		[2] 己方颜色	[3]预期落子点	[4] 气	[5] 棋块
+*	[输出]: [1] 是否为劫	[2] 对应劫点
+*	[劫]  : 只有一种模式: 黑白眼相交错。
 			x o @ x		x o @ x
 			o   o @		o @   @
 			x o @ x		x o @ x
-*	*判定: [1] 四周全敌 [2] 有且只有一方，只一气，且只一点
+*	[判定]: [1] 四周全敌 [2] 有且只有一方，为一气一点
 **------------------------------------------------------------------------*/
 static int judgeJie(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, int pos, STONE player) {
 	const static int
@@ -245,7 +264,7 @@ static int judgeJie(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, int pos, ST
 		if (qi[mark(xt, yt)] == 1) {						//是敌且只一气
 			if  (JieArmy == 1) return -1;					//有两个一气敌，非劫
 			else JieArmy =  1;
-			for (int j = 0; j < 4; j++) {					//1气敌只有自己
+			for (int j = 0; j < 4; j++) {					//一气敌只有自己
 				int xtt = xt + x_step[j],
 					ytt = yt + y_step[j];
 				if (judgeOut(xtt, ytt)
@@ -258,8 +277,9 @@ static int judgeJie(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, int pos, ST
 	return JiePos;
 }
 /*--------------------------------[ [4]:输赢判定(数子法) ]--------------------------------
-*	[RULE 4]:局势判定(数子法)
-*	无气杀我非杀他，为禁入
+*	[算法]:
+		[RULE 4]:局势判定(数子法)
+*	[注]: 无气杀我非杀他，为禁入
 **----------------------------------------------------------------------------------------*/
 static char judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
 	int ScoreBlack = 0,
@@ -275,10 +295,10 @@ static char judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
 	return ScoreBlack > ScoreWhite ? 1 : -1;		//贴子
 }
 /*--------------------------------[ 棋块数气 ]--------------------------------
-*	*输入: [1] 棋盘board
-*	*输出: [1] 棋盘上棋块mark [2] 棋块对应的气
-*	棋块: 上下左右连通的同一色棋的区域
-*	气:
+*	[输入]: [1] 棋盘board
+*	[输出]: [1] 棋盘上棋块mark [2] 棋块对应的气
+*	[棋块]: 上下左右连通的同一色棋的区域.
+*	[气]  : 同一棋块上下左右连接的空点总数.
 **--------------------------------------------------------------------------*/
 static void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark) {
 	//棋块标记

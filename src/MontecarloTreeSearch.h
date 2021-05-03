@@ -14,21 +14,22 @@ limitations under the License.
 #define MONTECARLO_TREE_SEARCH
 #include <vector>
 /******************************************************************************
-*					Montecarlo Search Tree 蒙特卡洛树搜索
+*					Montecarlo Tree Search 蒙特卡洛树搜索
 *	[算法]:
 		[1] selection,
 		[2] expansion,
 		[3] simulation,
 		[4] backpropagation.
-*	[注]:
-		生成新[State]状态的地方只有两个, Expand 和 Simulation
-		生成新[State]，必由上一State的复制
-		[State]的内存管理，只能由其构造,析构函数完成
 ******************************************************************************/
 template<class State>
 class MontecarloTreeSearch {
 public:
-	/*--------------------------------[ Montecarlo 树节点 ]--------------------------------*/
+	/*--------------------------------------------------------------------------------
+						Montecarlo 树节点
+	*	[数据]: [1]状态		[2]胜利次数		[3]失败次数
+				[4]父节点	[5]子节点列表	[6]子节点已满标志
+	*	[注]: root析构时，其连接的整棵树也会自动依次析构并释放内存.
+	--------------------------------------------------------------------------------*/
 	struct TreeNode {
 		int   winTime = 0, 
 			visitTime = 0;
@@ -43,12 +44,21 @@ public:
 				delete child[i];
 		}
 	};
-	/*--------------------------------[ 核心数据 ]--------------------------------*/
+	/*--------------------------------------------------------------------------------
+						核心数据
+	*	[数据]: [1]根节点		[2]最大搜索次数
+				[3]随机生成新状态函数指针	[4]判断输赢函数指针
+	--------------------------------------------------------------------------------*/
 	TreeNode root;
 	const int maxSearchTimes = 1E5;
-	bool(*newStateRandFunc)	(State&, State&, bool);			//生成新状态
+	bool(*newStateRandFunc)	(State&, State&, bool);			//随机生成新状态
 	char(*judgeWin)	        (State&);						//判断输赢
-	/*--------------------------------[ 构造/析构函数 ]--------------------------------*/
+	/*--------------------------------------------------------------------------------
+						构造函数
+	*	[输入]: 
+			[1]随机生成新状态函数指针	(状态, 新状态, 是否模拟标志)
+			[2]判断输赢函数指针			(状态)
+	--------------------------------------------------------------------------------*/
 	MontecarloTreeSearch(
 		bool(*_newStateRandFunc)(State&, State&, bool),
 		char(*_judgeWin)		(State&)
@@ -56,14 +66,14 @@ public:
 		newStateRandFunc(_newStateRandFunc),
 		judgeWin		(_judgeWin)
 	{ ; }
-	/*----------------------------------------------------------------------------
+	/*--------------------------------------------------------------------------------
 				Montecarlo Search Tree
-	*The process of MCTS is split up into four steps:
-	*	[1] selection,
-		[2] expansion,
-		[3] simulation,
-		[4] backpropagation.
-	*---------------------------------------------------------------------------*/
+	*[算法]:
+		[1] 选择
+		[2] 拓展
+		[3] 模拟
+		[4] 回溯
+	--------------------------------------------------------------------------------*/
 	State* run(State* state) {
 		root.state = state;
 		for (int i = 0; i < maxSearchTimes; i++) {
@@ -77,21 +87,22 @@ public:
 		root.state = NULL;
 		return Select(&root, false)->state;					//Ans
 	}
-	/*------------------------------------------------------------------------------
+	/*--------------------------------------------------------------------------------
 						TreePolicy
-		[1.Selection],[2.Expansion]阶段，
-		输入当前开始搜索的节点[node]，
-		Selection返回最好的需要expend的节点，注意如果节点是叶子结点直接返回。
-		基本策略是先找当前未选择过的子节点，如果有多个则随机选。
-		如果都选择过就找权衡过exploration/exploitation的UCB值最大的，如果UCB值相等则随机选。
-	**----------------------------------------------------------------------------*/
+	*	[1.选择],[2.拓展]
+	*	[输入]: 根节点
+		[输出]: 拓展的新子节点
+	*	[流程]:
+			[1] 尝试[拓展]该节点的子节点, 并返回子节点
+			[2] 若失败, 则标记该节点已满,[选择]该节点的一个子节点作为运算对象, 回到[1]
+	--------------------------------------------------------------------------------*/
 	TreeNode* TreePolicy(TreeNode* node) {
 		TreeNode* newNode = NULL;
 		while ( node != NULL && !judgeWin(*node->state)) {
 			if (node->isChildFull) {
 				node = Select(node, true); continue;
 			}
-			if (Expand(node, newNode))return newNode;		//尝试扩展子节点，若不行，则该点全满
+			if (Expand(node, newNode))return newNode;
 			else {
 				node->isChildFull = true;
 				node = Select(node, true);
@@ -100,12 +111,10 @@ public:
 		return node;
 	}
 	/*--------------------------------[ [1]Select 选择 ]--------------------------------
-	*	[输入]: [1] 树节点	[2] 探索开关
-	*	[输出]: [1] 树节点下最优子节点
-		以[UCB公式]为判别标准，
-		选择[node]节点下，最优子节点作为输出。
-		若isExploration关闭，则为Exploitation-Only仅利用模式，只按下目前最优的摇臂。
-		若isExploration开启，有探索尝试的机会
+	*	[输入]: [1] 节点	[2] 是否探索
+		[输出]: [1] 最优子节点
+	*	[算法]: UCB公式
+			分为[探索]和[不探索]模式.
 	**----------------------------------------------------------------------------*/
 	TreeNode* Select(TreeNode* node, bool isExplore) {
 		double UcbConst = isExplore == true ? sqrt(2) : 0,
@@ -120,12 +129,12 @@ public:
 		}
 		return bestNode;
 	}
-	/*--------------------------------[ UCB ]--------------------------------
-	*Upper Confidence Bound (UCB)上置信界算法:
-	*                              -----------------------
-	*             W(node)         /   In( N(parentNode) )
-	*UCT(node) = --------- + c * / ----------------------
-	*             N(node)       √         N(node)
+	/*-------------------------[ Upper Confidence Bound ]-----------------------------
+	*Upper Confidence Bound 上置信界算法:
+	*                              ---------------------
+	*             W(node)         / In( N(parentNode) )
+	*UCB(node) = --------- + C * / --------------------
+	*             N(node)      √         N(node)
 	**-----------------------------------------------------------------------*/
 	double UpperConfidenceBound(TreeNode* node, double C) {
 		double a = (double)	   node->winTime			/ node->visitTime,
@@ -133,8 +142,9 @@ public:
 		return a + C * sqrt(b);
 	}
 	/*--------------------------------[ [2]Expand 拓展 ]--------------------------------
-	*	在[node]节点上拓展一个新节点，随机选择下一步Action
-	*	[注]: 需保证新增节点与其他节点Action不同。
+	*	[算法]: 
+			基于输入节点, 随机选择下一步[动作], 作为一个新子节点并返回.
+	*	[注]: 需保证新增节点与其他节点[动作]不同.
 	**----------------------------------------------------------------------------*/
 	bool Expand(TreeNode* node, TreeNode*& newNode) {
 		//New State
@@ -150,23 +160,19 @@ public:
 		return true;
 	}
 	/*--------------------------------[ [3]Simulation 模拟 ]--------------------------------
-	对[node]节点的状态[state]，进行模拟，直到胜利结束。
-	返回该状态模拟的[Reward]奖惩值。
+	*	[算法]: 对输入节点的[状态], 进行[模拟]对战, 直到胜利为止.
+	*	[输出]: 该状态模拟的[奖惩]值.
 	**----------------------------------------------------------------------------*/
 	int Simulation(State* state) {
-		State* newState = new State;
-		(*newState) = (*state);
-		/*---- 开始模拟 ----*/
+		State newState = *state;
 		int reward = 0;
-		while ((reward = judgeWin(*newState)) == 0) 
-			if (!newStateRandFunc(*newState, *newState, true))
+		while ((reward = judgeWin(newState)) == 0) 
+			if (!newStateRandFunc(newState, newState, true))
 				break;
-		delete newState;
 		return reward;
 	}
 	/*--------------------------------[ [4]Backpropagation 回溯 ]--------------------------------
-	将[3]模拟的得到的[Reward]奖惩值，
-	从叶[node]往根回溯，更新每个相关的节点。
+	*	[算法]: 将[3]模拟的[奖惩]值, 从叶节点往根回溯, 更新每个相关节点.
 	**----------------------------------------------------------------------------*/
 	void Backpropagation(TreeNode* node, int reward) {
 		while (node != NULL) {
