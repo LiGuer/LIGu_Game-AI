@@ -44,10 +44,10 @@ struct State {
 //函数声明
 bool judgeOut(int x, int y);
 bool newStateRand(State&, State&, bool);
-bool downStone(State& state);
-void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& qiBlock);
-char judgeWin	 (State& state);
-bool judgeJie(State& board, Mat<int>& qi, Mat<int>& qiBlock);
+bool downStone	(State& state);
+void ComputerQi	(Mat<STONE>& board, Mat<int>& qi, Mat<int>& qiBlock);
+char judgeWin	(State& state);
+bool judgeJie	(State& board, Mat<int>& qi, Mat<int>& qiBlock);
 /*--------------------------------[ 下子 ]--------------------------------*/
 int run(STONE* board, int& x, int& y, STONE who, int pos) {
 	State root;
@@ -56,8 +56,8 @@ int run(STONE* board, int& x, int& y, STONE who, int pos) {
 	root.board.getData(board);
 	downStone(root);
 	run(root, pos);
-	x = pos % BOARDSIZE;
-	y = pos / BOARDSIZE;
+	x = root.board.i2x(pos);
+	y = root.board.i2y(pos);
 }
 int run(State& board, int& pos) {
 	typedef MontecarloTreeSearch<State> AI;
@@ -143,17 +143,17 @@ bool downStone(State& state) {
 *	禁入点判定: [1]上下左右若是我，只一气；若是敌，必不只一气；上下左右不为空
 **------------------------------------------------------------------------------*/
 void judgeEyeAndNot(State& board, Mat<int>& qi, Mat<int>& qiBlock) {
-	const static char
+	const static int
 		x_step[] = { 0, 0, 1,-1, 1,-1, 1,-1 },
 		y_step[] = { 1,-1, 0, 0, 1,-1,-1, 1 };
 	for (int i = 0; i < board.board.size(); i++) {
 		if (board[i] != 0) continue;
 		bool flagEye = 1, 
 				flagNot = 1;
-		for (int i = 0; i < 4; i++) {
-			int xt = board.board.i2x(i) + x_step[i],
-				yt = board.board.i2y(i) + y_step[i];
-			if (judgeOut(xt, yt)) continue;			//过界
+		for (int j = 0; j < 4; j++) {
+			int xt = board.board.i2x(i) + x_step[j],
+				yt = board.board.i2y(i) + y_step[j];
+			if (judgeOut(xt, yt)) continue;
 			//核心判断
 			if (board(xt, yt) != board.player || qi[qiBlock(xt, yt)] == 1) { flagEye = 0; }
 			if (board(xt, yt) == 0															//上下左右应不为空
@@ -162,8 +162,8 @@ void judgeEyeAndNot(State& board, Mat<int>& qi, Mat<int>& qiBlock) {
 				flagNot = 0;
 			}
 		}
-		if (flagEye) board[i] = EYEPOINT + board.player;
-		if (flagNot) board[i] = NOTPOINT;
+		if (flagEye) board.mark[i] = EYEPOINT + board.player;
+		if (flagNot) board.mark[i] = NOTPOINT;
 	}
 }
 /*--------------------------------[ 劫判定 ]--------------------------------
@@ -176,10 +176,10 @@ void judgeEyeAndNot(State& board, Mat<int>& qi, Mat<int>& qiBlock) {
 *	*判定: [1] 四周全敌 [2] 有且只有一方，只一气，且只一点
 **------------------------------------------------------------------------*/
 bool judgeJie(State& board, Mat<int>& qi, Mat<int>& qiBlock) {
-	const static char
+	const static int
 		x_step[] = { 0, 0, 1,-1, 1,-1, 1,-1 },
 		y_step[] = { 1,-1, 0, 0, 1,-1,-1, 1 };
-	bool Jieflag = 1, 
+	bool JieFlag = 1, 
 		 JieArmy = 0;
 	int x0 = board.board.i2x(board.JiePos),
 		y0 = board.board.i2y(board.JiePos);
@@ -189,21 +189,21 @@ bool judgeJie(State& board, Mat<int>& qi, Mat<int>& qiBlock) {
 		if (judgeOut(xt, yt)) continue;						//过界
 		if (board(xt, yt) == 0
 		||  board(xt, yt) == board.player) {				//四周非全敌，非劫
-			Jieflag = 0; break;
+			JieFlag = 0; break;
 		}
 		if (qi[qiBlock(xt, yt)] == 1) { 					//是敌且只1气
-			if (JieArmy == 1) { Jieflag = 0; break; }		//有两个1气敌，非劫
+			if (JieArmy == 1) { JieFlag = 0; break; }		//有两个1气敌，非劫
 			else JieArmy = 1;
 			for (int j = 0; j < 4; j++) {					//1气敌只有自己
 				int xtt = xt + x_step[j],
 					ytt = yt + y_step[j];
 				if (judgeOut(xtt, ytt) || (ytt == y0 && xtt == x0)) continue;			//过界
-				if (board(xtt, ytt) != board.player) { Jieflag = 0; JieArmy = 0; break; }
+				if (board(xtt, ytt) != board.player) { JieFlag = 0; JieArmy = 0; break; }
 			}
-			if (JieArmy) { board.JiePos = board.board.xy2i(xt, yt); Jieflag = 1; }
+			if (JieArmy) { board.JiePos = board.board.xy2i(xt, yt); JieFlag = 1; }
 		}
 	}
-	if (Jieflag) return true;
+	if (JieFlag) return true;
 	board.JiePos = -1; return false;
 }
 /*--------------------------------[ [4]:输赢判定(数子法) ]--------------------------------
@@ -229,12 +229,9 @@ char judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
 *	气:
 **--------------------------------------------------------------------------*/
 void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& qiBlock) {
-	const static char
-		x_step[] = { 0, 0, 1,-1, 1,-1, 1,-1 },
-		y_step[] = { 1,-1, 0, 0, 1,-1,-1, 1 };
-	char qiBlockCur = 1;
 	//棋块标记
-	char HeadStoneFlag[BOARDSIZE * BOARDSIZE] = { 0 };			//并查集头节点标记
+	int qiBlockCur = 1;
+	int HeadStoneFlag[BOARDSIZE * BOARDSIZE] = { 0 };			//并查集头节点标记
 	for (int y = 0; y < BOARDSIZE; y++) {
 		for (int x = 0; x < BOARDSIZE; x++) {
 			if (board(x, y) == 0) continue;
@@ -255,8 +252,8 @@ void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& qiBlock) {
 					//并查集 更新
 					int    HeadStoneMe   =  HeadStoneFlag[qiBlock(x, y)],
 						   HeadStoneLeft =  HeadStoneFlag[qiBlock(x - 1, y)];
-					while (HeadStoneMe   != HeadStoneFlag[HeadStoneMe])
-						   HeadStoneMe   =  HeadStoneFlag[HeadStoneMe];	//检索头节点
+					while (HeadStoneMe   != HeadStoneFlag[HeadStoneMe  ])
+						   HeadStoneMe   =  HeadStoneFlag[HeadStoneMe  ];	//检索头节点
 					while (HeadStoneLeft != HeadStoneFlag[HeadStoneLeft])
 						   HeadStoneLeft =  HeadStoneFlag[HeadStoneLeft];	//检索头节点
 					if (HeadStoneMe != HeadStoneLeft)
@@ -272,26 +269,31 @@ void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& qiBlock) {
 	}
 	//完成棋块标记
 	for (int i = 0; i < board.size(); i++) {
-		char   HeadStone  = HeadStoneFlag[qiBlock[i]];
+		int    HeadStone  = HeadStoneFlag[qiBlock[i]];
 		while (HeadStone != HeadStoneFlag[HeadStone])
 			   HeadStone  = HeadStoneFlag[HeadStone];	//检索头节点
 		qiBlock[i] = HeadStone;
 	}
 	//棋块数气
-	for (int y = 0; y < BOARDSIZE; y++) {
-		for (int x = 0; x < BOARDSIZE; x++) {
-			bool qiflag[BOARDSIZE * BOARDSIZE] = { 0 };						//#需更改
-			if (board(x, y) == 0) {
-				for (int i = 0; i < 4; i++) {
-					char xt = x + x_step[i],
-						 yt = y + y_step[i];
-					if (judgeOut(xt, yt)
-						|| board(xt, yt) == 0
-						|| qiflag[qiBlock(xt, yt)] == 1)continue;
-					qi[qiBlock(xt, yt)]++;
-					qiflag[qiBlock(xt, yt)] = 1;
-				}
-			}
+	const static int
+		x_step[] = { 0, 0, 1,-1 },
+		y_step[] = { 1,-1, 0, 0 };
+	int buf[4], bufcur = 0;
+	for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
+		if (board[i] != 0) continue;
+		bufcur = 0;
+		for (int j = 0; j < 4; j++) {
+			int xt = board.i2x(i) + x_step[j],
+				yt = board.i2y(i) + y_step[j];
+			if (judgeOut(xt, yt)
+				|| board(xt, yt) == 0)continue;
+			buf[bufcur++] = qiBlock(xt, yt);
+		}
+		for (int j = 0; j < bufcur; j++) {
+			if (buf[j] == 0) continue;
+			for (int k = j + 1; k < bufcur; k++)
+				if (buf[j] == buf[k]) buf[k] = 0;
+			qi[buf[j]]++;
 		}
 	}
 }

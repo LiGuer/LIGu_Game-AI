@@ -45,15 +45,15 @@ public:
 	};
 	/*--------------------------------[ 核心数据 ]--------------------------------*/
 	const int maxSearchTimes = 100000;
-	bool	(*newStateRandFunc)	(State&, State&);			//生成新状态
-	char	(*judgeWin)	        (State&);					//判断输赢
+	bool(*newStateRandFunc)	(State&, State&, bool);			//生成新状态
+	char(*judgeWin)	        (State&);						//判断输赢
 	/*--------------------------------[ 构造函数 ]--------------------------------*/
 	MontecarloTreeSearch(
-		bool	(*_newStateRandFunc)	(State&, State&),
-		char	(*_judgeWin)	        (State&),
+		bool(*_newStateRandFunc)(State&, State&, bool),
+		char(*_judgeWin)		(State&)
 	) :
 		newStateRandFunc(_newStateRandFunc),
-		_judgeWin		(_judgeWin)
+		judgeWin		(_judgeWin)
 	{ ; }
 	/*----------------------------------------------------------------------------
 				Montecarlo Search Tree
