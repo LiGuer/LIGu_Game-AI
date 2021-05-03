@@ -33,7 +33,6 @@ typedef char STONE;
 struct State {
 	int  pos = -1, JiePos = -1;
 	char player = 0;
-	State* preState = NULL;
 	Mat<STONE> board{ BOARDSIZE , BOARDSIZE };
 	Mat<char>  mark { BOARDSIZE , BOARDSIZE };
 	STONE& operator[](int i)		{ return board[i]; }
@@ -45,19 +44,35 @@ struct State {
 //函数声明
 bool judgeOut(int x, int y);
 bool newStateRand(State& state, State& newState);
+bool newStateRand(State& state);
+char judgeWin	 (State& state);
 /*--------------------------------[ 下子 ]--------------------------------*/
-int run(State& board, int& x, int& y, STONE who) {
+int run(STONE* board, int& x, int& y, STONE who, int pos) {
+	State root;
+	root.player = who;
+	root.pos	= pos;
+	root.board.getData(board);
+	downStone(root);
+	run(root, pos);
+	x = pos / BOARDSIZE;
+	y = pos % BOARDSIZE;
+}
+int run(State& board, int& pos) {
 	typedef MontecarloTreeSearch<State> AI;
-	AI ai;
-	State* ans = ai.run(&board);
-	x = ans->pos / BOARDSIZE;
-	y = ans->pos % BOARDSIZE;
+	AI ai(
+		newStateRand,
+		newStateRand,
+		judgeWin
+	);
+	pos = ai.run(&board)->pos;
 }
 /*--------------------------------[ nextStateRand ]--------------------------------
 基于输入[board]棋盘，在可能的动作下，随机选择一个动作
 *	* [a,b)随机整数: (rand() % (b-a))+ a;
 **----------------------------------------------------------------------------*/
 bool newStateRand(State& state, State& newState) {
+	newState.board  = state.board;
+	newState.player =-state.player;
 	int num = 0, index;
 	for (int i = 0; i < state.board.size(); i++)
 		if (state.mark [i] == 0 
@@ -69,11 +84,10 @@ bool newStateRand(State& state, State& newState) {
 		if (state.mark [i] == 0
 		&&  state.board[i] == 0) index--;
 		if (index == 0) { 
-			newState.pos = i; 
-			downStone(newState); 
-			break; 
+			newState.pos = i; break; 
 		}
 	}
+	downStone(newState);
 	return true;
 }
 bool newStateRand(State& state) {
@@ -87,17 +101,17 @@ bool newStateRand(State& state) {
 	for (int i = 0; i < state.board.size(); i++) {
 		if (state.mark [i] == 0
 		&&  state.board[i] == 0) index--;
-		if (index == 0) { 
-			state.pos = i; 
-			downStone(state); 
-			break; 
+		if (index == 0) {
+			state.pos = i; break;
 		}
 	}
+	downStone(state);
 	return true;
 }
 /*--------------------------------[ 判断是否过界 ]--------------------------------*/
 bool judgeOut(int x, int y) {
-	return (x >= 0 && x < BOARDSIZE && y >= 0 && y < BOARDSIZE) ? false : true;
+	return (x >= 0 && x < BOARDSIZE 
+		 && y >= 0 && y < BOARDSIZE) ? false : true;
 }
 /******************************************************************************
 *                   围棋规则函数
@@ -109,6 +123,7 @@ bool judgeOut(int x, int y) {
 bool downStone(State& state) {
 	//落子
 	state[state.pos] = state.player;
+	state.mark.zero();
 	//棋块数气
 	Mat<int> 
 		qi		(state.board.size(), 1), 
@@ -209,9 +224,9 @@ bool judgeJie(State& board, Mat<int>& qi, Mat<int>& qiBlock) {
 *	[RULE 4]:局势判定(数子法)
 *	无气杀我非杀他，为禁入
 **----------------------------------------------------------------------------------------*/
-int judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
+char judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
 	double ScoreBlack = 0,
-		ScoreWhite = 0;
+		   ScoreWhite = 0;
 	for (int i = 0; i < state.board.size(); i++) {
 		if		(state.board[i] == 0)					return 0;
 		else if (state.board[i] == BLACK)				ScoreBlack++;
@@ -236,7 +251,7 @@ void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& qiBlock) {
 	char HeadStoneFlag[BOARDSIZE * BOARDSIZE] = { 0 };			//并查集头节点标记
 	for (int y = 0; y < BOARDSIZE; y++) {
 		for (int x = 0; x < BOARDSIZE; x++) {
-			if (board(x, y) == 0)continue;
+			if (board(x, y) == 0) continue;
 			bool flag = 1;
 			//STONE UP
 			if (y > 0 && board(x, y - 1) == board(x, y)) {
@@ -247,13 +262,17 @@ void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& qiBlock) {
 			if (x > 0 && board(x - 1, y) == board(x, y)) {
 				flag = 0;
 				if (qiBlock(x, y) == 0)
-					qiBlock(x, y) = qiBlock(x - 1, y);
-				else if (qiBlock(x, y) != qiBlock(x - 1, y)) {
+					qiBlock(x, y) =  qiBlock(x - 1, y);
+				else if (
+					qiBlock(x, y) != qiBlock(x - 1, y)
+				) {
 					//并查集 更新
-					int HeadStoneMe = HeadStoneFlag[qiBlock(x, y)];
-					while (HeadStoneFlag[HeadStoneMe] != HeadStoneMe)HeadStoneMe = HeadStoneFlag[HeadStoneMe];	//检索头节点
-					int HeadStoneLeft = HeadStoneFlag[qiBlock(x - 1, y)];
-					while (HeadStoneFlag[HeadStoneLeft] != HeadStoneLeft)HeadStoneLeft = HeadStoneFlag[HeadStoneLeft];	//检索头节点
+					int    HeadStoneMe   =  HeadStoneFlag[qiBlock(x, y)],
+						   HeadStoneLeft =  HeadStoneFlag[qiBlock(x - 1, y)];
+					while (HeadStoneMe   != HeadStoneFlag[HeadStoneMe])
+						   HeadStoneMe   =  HeadStoneFlag[HeadStoneMe];	//检索头节点
+					while (HeadStoneLeft != HeadStoneFlag[HeadStoneLeft])
+						   HeadStoneLeft =  HeadStoneFlag[HeadStoneLeft];	//检索头节点
 					if (HeadStoneMe != HeadStoneLeft)
 						HeadStoneFlag[HeadStoneLeft] = HeadStoneMe;
 				}
@@ -266,10 +285,11 @@ void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& qiBlock) {
 		}
 	}
 	//完成棋块标记
-	for (int x = 0; x < board.size(); x++) {
-		char HeadStone = HeadStoneFlag[qiBlock[x]];
-		while (HeadStoneFlag[HeadStone] != HeadStone)HeadStone = HeadStoneFlag[HeadStone];	//检索头节点
-		qiBlock[x] = HeadStone;
+	for (int i = 0; i < board.size(); i++) {
+		char   HeadStone  = HeadStoneFlag[qiBlock[i]];
+		while (HeadStone != HeadStoneFlag[HeadStone])
+			   HeadStone  = HeadStoneFlag[HeadStone];	//检索头节点
+		qiBlock[i] = HeadStone;
 	}
 	//棋块数气
 	for (int y = 0; y < BOARDSIZE; y++) {
@@ -277,8 +297,9 @@ void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& qiBlock) {
 			bool qiflag[BOARDSIZE * BOARDSIZE] = { 0 };						//#需更改
 			if (board(x, y) == 0) {
 				for (int i = 0; i < 4; i++) {
-					char xt = x + x_step[i], yt = y + y_step[i];
-					if (yt < 0 || xt < 0 || yt >= BOARDSIZE || xt >= BOARDSIZE
+					char xt = x + x_step[i],
+						 yt = y + y_step[i];
+					if (judgeOut(xt, yt)
 						|| board(xt, yt) == 0
 						|| qiflag[qiBlock(xt, yt)] == 1)continue;
 					qi[qiBlock(xt, yt)]++;
@@ -289,5 +310,4 @@ void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& qiBlock) {
 	}
 }
 };
-#endif // MAINWINDOW_H
-
+#endif

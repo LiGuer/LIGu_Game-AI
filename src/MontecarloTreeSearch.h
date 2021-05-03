@@ -49,7 +49,15 @@ public:
 	bool	(*newStateRandFunc)	(State&);					//生成新状态
 	char	(*judgeWin)	        (State&);					//判断输赢
 	/*--------------------------------[ 构造函数 ]--------------------------------*/
-	MontecarloTreeSearch() { ; }
+	MontecarloTreeSearch(
+		bool	(*_newStateRandFunc)	(State&, State&),
+		bool	(*_newStateRandFunc)	(State&),
+		char	(*_judgeWin)	        (State&),
+	) :
+		newStateRandFunc(_newStateRandFunc),
+		newStateRandFunc(_newStateRandFunc),
+		_judgeWin		(_judgeWin)
+	{ ; }
 	/*----------------------------------------------------------------------------
 				Montecarlo Search Tree
 	*The process of MCTS is split up into four steps:
