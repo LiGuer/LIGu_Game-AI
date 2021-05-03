@@ -19,6 +19,23 @@ limitations under the License.
 #include "MontecarloTreeSearch.h"
 /******************************************************************************
 *                    围棋AI Go-AI
+-------------------------------------------------------------------------------
+*	Example:
+#include "../LiGu_Codes/Daiyu-Go/src/go.h"
+int main() {
+	Go_AI::State board;
+	board.player = WHITE;
+	int JiePos = -1;
+	while (true) {
+		Go_AI::run(&board, JiePos);
+		printf("AI:%d\n", board.pos);
+		for (char y = 0; y < 9; y++) {
+			for (char x = 0; x < 9; x++) {
+				printf("%c ", board(x ,y) == 0 ? '+' : (board(x ,y) == 1 ? 'x' : 'o'));
+			}printf("\n");
+		}printf("\n");
+	}
+}
 ******************************************************************************/
 namespace Go_AI {
 #define BOARDSIZE 9
@@ -74,11 +91,10 @@ void run(State* board, int& JiePos) {
 		newStateRand,
 		judgeWin
 	);
-	State* state = ai.run(board);
-	*board = *state;
+	*board = *ai.run(board);
 	JiePos = -1;
-	for (int i = 0; i < state->mark.size(); i++)
-		if(state->mark[i] == JIEPOINT) JiePos = i;
+	for (int i = 0; i < board->mark.size(); i++)
+		if(board->mark[i] == JIEPOINT) JiePos = i;
 }
 /*--------------------------------[ nextStateRand ]--------------------------------
 基于输入[board]棋盘，在可能的动作下，随机选择一个动作

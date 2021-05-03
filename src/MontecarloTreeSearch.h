@@ -38,7 +38,7 @@ public:
 		std::vector<TreeNode*> child;
 		// Îö¹¹º¯Êý
 		~TreeNode() {
-			//delete state;
+			delete state;
 			for (int i = 0; i < child.size(); i++)
 				delete child[i];
 		}
@@ -74,6 +74,7 @@ public:
 				Simulation(expandNode->state)				//[3]
 			);
 		}
+		root.state = NULL;
 		return Select(&root, false)->state;					//Ans
 	}
 	/*------------------------------------------------------------------------------
