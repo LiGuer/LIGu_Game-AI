@@ -38,7 +38,7 @@ int main() {
 }
 ******************************************************************************/
 namespace Go_AI {
-#define BOARDSIZE 9
+#define BOARDSIZE 13
 #define BLACK  1
 #define WHITE -1
 #define EYEPOINT -10

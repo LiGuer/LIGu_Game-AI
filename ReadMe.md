@@ -1,32 +1,42 @@
 # Daiyu-Go	黛玉-Go 
-The AI of [Go],[GoBang] named "Daiyu黛玉".
-## [1].Go 围棋  
-* core: <go.h/cpp>
+The AI of [Go],[GoBang],[Chess] named "Daiyu黛玉".
+## [0].算法
+* 文件:  
+(1) <MiniMax.h>				MiniMax算法  
+(2) <MontecarloTreeSearch.h> 	Montecarlo树搜索算法  
+### MiniMax算法:  
+* 决策树, 深度优先搜索, 遍历K层所有下棋情况  
+* alpha-beta剪枝  
+* 	[流程]:  
+		[0] 到达层数阈值, 返回当前状态的评价(评价函数)  
+		[1] 基于当前状态, 生成新状态, 对于每一个可能的新状态  
+		[2] 递归决策函数, 深度优先搜索生成&遍历博弈树  
+		[3] 收尾  
+		[3.1] 单数博弈层(对手层) 取最小  
+		[3.2] 双数博弈层(我  层) 取最大  
+		[3.3] alpha-beta剪枝  
+### Montecarlo树搜索:  
 * 核心思想: "频率估计概率"  
-           用一千万次随机下子,估计每一点的胜率,来寻找最优的落子点。  
-		   (十万场,平均每场一百步)  
+	用一千万次随机下子,估计每一点的胜率,来寻找最优的落子点。  
+	(十万场,平均每场一百步)  
 * 核心算法:  
-	* 蒙特卡洛树搜索MCTS  
-		[1] 选择 | 依据UCB公式,选择节点,兼顾Exploit & Explore  
-		[2] 拓展 | 扩展新的树节点  
-		[3] 模拟 | 对新增节点进行随机走子,直至终盘,得到一场随机比赛结果  
-		[4] 回溯 | 将模拟所得输赢结果,从新增节点开始向根节点回溯(更新节点权值)  
+	[1] 选择 | 依据UCB公式,选择节点,兼顾Exploit & Explore  
+	[2] 拓展 | 扩展新的树节点  
+	[3] 模拟 | 对新增节点进行随机走子,直至终盘,得到一场随机比赛结果  
+	[4] 回溯 | 将模拟所得输赢结果,从新增节点开始向根节点回溯(更新节点权值)  
+## [1].Go 围棋  
+* 文件:	<go.h>
+* 算法:  Montecarlo树搜索
 * 围棋规则:  
-    [1]无气提子 [2]非提禁入 [3]劫隔一手 [4]数子法判定输赢  
+	[1]无气提子 
+	[2]非提禁入 
+	[3]劫隔一手 
+	[4]数子法判定输赢  
 	[other] 真眼活棋  
-
-* 注.目前围棋一子思考时间是27秒以内,暂无游戏体验感,后期进一步优化。  
-     五子棋速度可以。  
-
 ## [2].GoBang 五子棋  
-* core: <gobang.h/cpp>  
-* The program of GoBang-AI is in the src/gobang.cpp and gobang.h.   
-* The algorithm of GoBang-AI is "Minimax".  
-* The UI is built by QT.  
-* ------------------  
-* core: <gobang.h/cpp>  
+* 文件:	<gobang.h>  
 * 算法:  
-	* 决策树, 深度优先搜索, 遍历4层所有下棋情况
+	* 决策树, 深度优先搜索, 遍历K层所有下棋情况
 	* 剪枝算法:   
 		(1)alpha-beta剪枝算法   
 		(2)四周无子格点直接略过。(不像围棋有"飞子")   
@@ -34,10 +44,9 @@ The AI of [Go],[GoBang] named "Daiyu黛玉".
 	* Policy():决策函数/博弈树(极小化极大值算法)  
 	* Evaluate():评价函数，棋局分数评价判断。 
 
-## [3].Chess 国际象棋
-* core: <chess.h/cpp>  
-* 未完成, 待续
-
+## [3].Chess 象棋
+* 文件:	<chess.h>  
+* 算法:  Montecarlo树搜索
 ## Image
 ![Image text](https://github.com/LiGuer/Daiyu-Go/blob/master/contest/vs%E9%87%8E%E7%8B%90%E4%B8%AD%E4%B8%8B12%E7%BA%A7.png)  
 ![Image text](https://github.com/LiGuer/Daiyu-Go/blob/master/contest/20201122182136.png)  
