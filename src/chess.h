@@ -39,6 +39,11 @@ struct State {
 	Mat<Piece> board{ BOARDSIZE ,BOARDSIZE };
 	Piece& operator[](int i)		{ return board[i]; }
 	Piece& operator()(int x, int y) { return board(x, y); }
+	void clear() {
+		kidIndex.clear();
+		kidList .clear();
+		kidNum = -1;
+	}
 };
 /******************************************************************************
 *                    基础函数
@@ -75,7 +80,6 @@ bool newStateRand(State& state, State& newState, bool isSimulation) {
 			if (state.board[i] * -state.player > 0) {
 				int t = getNextStep(state.board, i);
 				state.kidNum += t;
-				printf("%d\n", t);
 				state.kidList.push_back(t);
 			}
 	}
@@ -102,11 +106,6 @@ bool newStateRand(State& state, State& newState, bool isSimulation) {
 	newState.eat			= state[newState.ed];
 	newState[newState.ed]	= state[newState.st];
 	newState[newState.st]	= 0;
-	for (char x = 0; x < BOARDSIZE; x++) {
-		for (char y = 0; y < BOARDSIZE; y++) {
-			printf("%2d ", newState.board(x, y));
-		}printf("\n");
-	}printf("\n");
 	return true;
 }
 // 用于Montecarlo[3. 模拟]
@@ -136,11 +135,6 @@ bool newStateRand(State& state) {
 	state.eat		= state[state.ed];
 	state[state.ed] = state[state.st];
 	state[state.st] = 0;
-	for (char x = 0; x < BOARDSIZE; x++) {
-		for (char y = 0; y < BOARDSIZE; y++) {
-			printf("%2d ", state.board(x, y));
-		}printf("\n");
-	}printf("\n");
 	return true;
 }
 /*--------------------------------[ 判断是否过界 ]--------------------------------*/
@@ -198,10 +192,11 @@ int getNextStep(Mat<Piece>& board, int pos, int index) {
 			int xt = x + x_step[i], 
 				yt = y + y_step[i];
 			while (!judgeOut(xt, yt) && board(xt, yt) * piece <= 0) {
-				xt += x_step[i]; 
-				yt += y_step[i];
 				NextStepNum++;
 				if (index-- == 1) return board.xy2i(xt, yt);
+				if (board(xt, yt) * piece < 0) break;
+				xt += x_step[i];
+				yt += y_step[i];
 			}
 		}
 	}break;
@@ -210,10 +205,11 @@ int getNextStep(Mat<Piece>& board, int pos, int index) {
 			int xt = x + x_step[i], 
 				yt = y + y_step[i];
 			while (!judgeOut(xt, yt) && board(xt, yt) * piece <= 0) {
-				xt += x_step[i]; 
-				yt += y_step[i];
 				NextStepNum++;
 				if (index-- == 1) return board.xy2i(xt, yt);
+				if (board(xt, yt) * piece < 0) break;
+				xt += x_step[i];
+				yt += y_step[i];
 			}
 		}
 	}break;
@@ -231,10 +227,11 @@ int getNextStep(Mat<Piece>& board, int pos, int index) {
 			int xt = x + x_step[i], 
 				yt = y + y_step[i];
 			while (!judgeOut(xt, yt) && board(xt, yt) * piece <= 0) {
-				xt += x_step[i]; 
-				yt += y_step[i];
 				NextStepNum++;
 				if (index-- == 1) return board.xy2i(xt, yt);
+				if (board(xt, yt) * piece < 0) break;
+				xt += x_step[i];
+				yt += y_step[i];
 			}
 		}
 	}break;
@@ -244,9 +241,9 @@ int getNextStep(Mat<Piece>& board, int pos, int index) {
 			NextStepNum++;
 			if (index-- == 1) return board.xy2i(x + t, y);
 		}
-		if (((piece > 0 && y == 1)
-			|| (piece < 0 && y == 6))
-			&& !judgeOut(x + 2 * t, y) && board(x + 2 * t, y)* piece <= 0) {
+		if (((piece > 0 && x == 1)
+		||   (piece < 0 && x == 6))
+		&& !judgeOut(x + 2 * t, y) && board(x + 2 * t, y)* piece <= 0) {
 			NextStepNum++;
 			if (index-- == 1) return board.xy2i(x + 2 * t, y);
 		}
