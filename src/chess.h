@@ -20,6 +20,24 @@ limitations under the License.
 #include "MontecarloTreeSearch.h"
 /******************************************************************************
 *                    π˙º œÛ∆ÂAI  Chess-AI
+------------------------------------------------------------------------------
+*Example:
+	#include "../LiGu_Codes/Daiyu-Go/src/chess.h"
+	int main() {
+		Chess_AI::State board;
+		board.player = -1;
+		Chess_AI::boardInit(board.board);
+		while (true) {
+			board.clear();
+			Chess_AI::run(&board);
+			printf("AI:%d %d\n", board.st, board.ed);
+			for (char x = 0; x < BOARDSIZE; x++) {
+				for (char y = 0; y < BOARDSIZE; y++) {
+					printf("%2d ", board(x, y));
+				}printf("\n");
+			}printf("\n");
+		}
+	}
 ******************************************************************************/
 namespace Chess_AI {
 #define BOARDSIZE 8
