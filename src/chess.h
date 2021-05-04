@@ -221,7 +221,7 @@ int getNextStep(Mat<Piece>& board, int pos, int index) {
 				yfoot = y + y_step[i % 4 + 4] * (i >  4 ? 1 : 0);
 			if (judgeOut(xt, yt) 
 				|| board(xt, yt) * piece > 0
-				|| board(xfoot, yfoot) != 0	//¶ÂÂí½Å
+				|| board(xfoot, yfoot) != 0						//¶ÂÂí½Å
 			) continue;
 			NextStepNum++;
 			if (index-- == 1) return board.xy2i(xt, yt);
