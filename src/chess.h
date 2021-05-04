@@ -215,9 +215,14 @@ int getNextStep(Mat<Piece>& board, int pos, int index) {
 	}break;
 	case Knight: {												// Âí
 		for (int i = 0; i < 8; i++) {
-			int xt = x + x_step[i % 4 + 4] + i <= 4 ? 1 : 0,
-				yt = y + y_step[i % 4 + 4] + i >  4 ? 1 : 0;
-			if (judgeOut(xt, yt) || board(xt, yt) * piece > 0) continue;
+			int xt = x + x_step[i % 4 + 4] * (i <= 4 ? 2 : 1),
+				yt = y + y_step[i % 4 + 4] * (i >  4 ? 2 : 1);
+			int xfoot = x + x_step[i % 4 + 4] * (i <= 4 ? 1 : 0),
+				yfoot = y + y_step[i % 4 + 4] * (i >  4 ? 1 : 0);
+			if (judgeOut(xt, yt) 
+				|| board(xt, yt) * piece > 0
+				|| board(xfoot, yfoot) != 0	//¶ÂÂí½Å
+			) continue;
 			NextStepNum++;
 			if (index-- == 1) return board.xy2i(xt, yt);
 		}
