@@ -29,8 +29,8 @@ int main() {
 	while (true) {
 		Go_AI::run(&board, JiePos);
 		printf("AI:%d\n", board.pos);
-		for (char y = 0; y < 9; y++) {
-			for (char x = 0; x < 9; x++) {
+		for (char x = 0; x < BOARDSIZE; x++) {
+			for (char y = 0; y < BOARDSIZE; y++) {
 				printf("%c ", board(x ,y) == 0 ? '+' : (board(x ,y) == 1 ? 'x' : 'o'));
 			}printf("\n");
 		}printf("\n");
