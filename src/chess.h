@@ -15,6 +15,7 @@ limitations under the License.
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h> 
+#include <algorithm> 
 #include "../../LiGu_AlgorithmLib/Mat.h"
 #include "MontecarloTreeSearch.h"
 /******************************************************************************
@@ -31,10 +32,12 @@ enum { King = 1, Queen, Bishop, Knight, Rook, Pawn };	//王,后,象,马,车,兵
 *	[数据]: [1]下子位置		[2]棋手		[3]棋盘
 ******************************************************************************/
 struct State {
-	int st, ed;
-	Piece player = 0;
-	Mat<Piece> board{ BOARDSIZE , BOARDSIZE };
-	Mat<int>   mark { BOARDSIZE , BOARDSIZE };
+	int   st, ed;
+	char  player = 0;
+	Piece eat = 0;
+	Mat<Piece> board{ BOARDSIZE ,BOARDSIZE };
+	int kidNum = -1;
+	std::vector<int> kidIndex;
 	Piece& operator[](int i)		{ return board[i]; }
 	Piece& operator()(int x, int y) { return board(x, y); }
 };
@@ -64,22 +67,39 @@ void run(State* board, int& JiePos) {
 // 用于Montecarlo[2. 拓展]
 bool newStateRand(State& state, State& newState, bool isSimulation) {
 	if (isSimulation) return newStateRand(state);
-	newState.board = state.board;
-	newState.player = -state.player;
 	//[1]
-	int num = 0;
 	std::vector<int> numList;
-	for (int i = 0; i < state.board.size(); i++)
-		if (state.board[i] == state.player) {
-			int t = getNextStep(state.board, i);
-			numList.push_back(t);
-			num += t;
-		}
-	if (num == 0) return false;
-	//[2]
-	int index = rand() % num + 1;
-	for (int i = 0; i < state.board.size(); i++) {
+	if (state.kidNum == -1) {
+		state.kidNum = 0;
+		for (int i = 0; i < state.board.size(); i++)
+			if (state.board[i] ==   state.player) {
+				int t = getNextStep(state.board, i);
+				state.kidNum += t;
+				numList.push_back(t);
+			}
 	}
+	if (state.kidNum - state.kidIndex.size() == 0) return false;
+	//[2]
+	int index = rand() % (state.kidNum - state.kidIndex.size()) + 1, 
+		cur   = 0;
+	std::sort(state.kidIndex.begin(), state.kidIndex.end());
+	for (int i = 0; i < state.kidIndex.size(); i++)
+		if (state.kidIndex[i] == index)index++;
+	state.kidIndex.push_back(index);
+
+	for (int i = 0; i < newState.board.size(); i++)
+		if (newState.board[i] == newState.player) {
+			index -= numList[cur++];
+			if (index <= 0) {
+				newState.st = i;
+				newState.ed = getNextStep(newState.board, i, index);
+				break;
+			}
+		}
+	newState.board			= state.board;
+	newState.player			=-state.player;
+	newState.eat			= state[newState.ed];
+	newState[newState.ed]	= state[newState.st];
 	return true;
 }
 // 用于Montecarlo[3. 模拟]
@@ -96,9 +116,18 @@ bool newStateRand(State& state) {
 		}
 	if (num == 0) return false;
 	//[2]
-	int index = rand() % num + 1;
-	for (int i = 0; i < state.board.size(); i++) {
-	}
+	int index = rand() % num + 1, cur = 0;
+	for (int i = 0; i < state.board.size(); i++)
+		if (state.board[i] == state.player) {
+			index -= numList[cur++];
+			if (index <= 0) {
+				state.st = i;
+				state.ed = getNextStep(state.board, i, index);
+				break;
+			}
+		}
+	state.eat		= state[state.ed];
+	state[state.ed] = state[state.st];
 	return true;
 }
 /*--------------------------------[ 判断是否过界 ]--------------------------------*/
@@ -112,14 +141,14 @@ bool judgeOut(int x, int y) {
 /*--------------------------------[ 判断输赢 ]--------------------------------*/
 char judgeWin(State& state) {
 	bool flagB = 1, flagW = 1;
-	for (int i = 0; i < state.board.size; i++) {
+	for (int i = 0; i < state.board.size(); i++) {
 		if (state[i] ==  King) flagW = 0;
 		if (state[i] == -King) flagB = 0;
 	}
 	return flagB ? BLACK : (flagW ? WHITE : 0);
 }
 /*--------------------------------[ 下一步状态数量 ]--------------------------------*/
-int getNextStep(Mat<Piece>& board, int pos) {
+int getNextStep(Mat<Piece>& board, int pos, int index = -1) {
 	Piece piece = board[pos];
 	int x = board.i2x(pos),
 		y = board.i2y(pos),
@@ -134,6 +163,7 @@ int getNextStep(Mat<Piece>& board, int pos) {
 				yt = y + y_step[i];
 			if (judgeOut(xt, yt) || board(xt, yt) * piece > 0) continue;
 			NextStepNum++;
+			if (index-- == 0) return board.xy2i(xt, yt);
 		}
 	}break;
 	Queen: {												// 女王
@@ -144,6 +174,7 @@ int getNextStep(Mat<Piece>& board, int pos) {
 				xt += x_step[i]; 
 				yt += y_step[i];
 				NextStepNum++;
+				if (index-- == 0) return board.xy2i(xt, yt);
 			}
 		}
 	}break;
@@ -155,6 +186,7 @@ int getNextStep(Mat<Piece>& board, int pos) {
 				xt += x_step[i]; 
 				yt += y_step[i];
 				NextStepNum++;
+				if (index-- == 0) return board.xy2i(xt, yt);
 			}
 		}
 	}break;
@@ -164,6 +196,7 @@ int getNextStep(Mat<Piece>& board, int pos) {
 				yt = y + y_step[i % 4 + 4] + i >  4 ? 1 : 0;
 			if (judgeOut(xt, yt)) continue;
 			NextStepNum++;
+			if (index-- == 0) return board.xy2i(xt, yt);
 		}
 	}break;
 	Rook: {													// 车
@@ -174,17 +207,22 @@ int getNextStep(Mat<Piece>& board, int pos) {
 				xt += x_step[i]; 
 				yt += y_step[i];
 				NextStepNum++;
+				if (index-- == 0) return board.xy2i(xt, yt);
 			}
 		}
 	}break;
 	Pawn: {													// 兵
 		int t = piece > 0 ? 1 : -1;
-		if (!judgeOut(x,y+t) && board(x, y + t) * piece < 0)
+		if (!judgeOut(x + t, y) && board(x + t, y) * piece < 0) {
 			NextStepNum++;
+			if (index-- == 0) return board.xy2i(x + t, y);
+		}
 		if (((piece > 0 && y == 1)
 		  || (piece < 0 && y == 6))
-			&& !judgeOut(x, y + 2 * t) && board(x, y + 2 * t) * piece < 0)
+			&& !judgeOut(x + 2 * t, y) && board(x + 2 * t, y) * piece < 0){
 			NextStepNum++;
+			if (index-- == 0) return board.xy2i(x + 2 * t, y);
+		}
 	}
 	}
 	return NextStepNum;
