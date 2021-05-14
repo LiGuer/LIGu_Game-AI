@@ -91,7 +91,8 @@ void run(State* board, int& JiePos) {
 	typedef MontecarloTreeSearch<State> AI;
 	AI ai(
 		newStateRand,
-		judgeWin
+		judgeWin,
+		1E5
 	);
 	*board = *ai.run(board);
 	JiePos = -1;
@@ -292,7 +293,7 @@ static char judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
 		else if (state.mark [i] == EYEPOINT + BLACK)	ScoreBlack++;
 		else if (state.mark [i] == EYEPOINT + WHITE)	ScoreWhite++;
 	}
-	return ScoreBlack > ScoreWhite ? 1 : -1;		//贴子
+	return ScoreBlack - 3.75 > ScoreWhite ? 1 : -1;		//贴子
 }
 /*--------------------------------[ 棋块数气 ]--------------------------------
 *	[输入]: [1] 棋盘board
