@@ -151,7 +151,7 @@ public:
 class ConvLayer {
 public:
 	Tensor<> *kernel, out;
-	Mat<> bias; bool isBias = false;
+	Mat<> bias; bool isBias = true;
 	int outChannelNum, padding, stride;
 	/*----------------[ init ]----------------*/
 	ConvLayer() { ; }
@@ -161,9 +161,9 @@ public:
 	void init(int inChannelNum, int _outChannelNum, int kernelSize, int _padding, int _stride) {
 		outChannelNum	= _outChannelNum, 
 		padding			= _padding, 
-		stride			= _stride;
-		kernel = (Tensor<>*)malloc(outChannelNum * sizeof(Tensor<>));
-		for (int i = 0; i < outChannelNum; i++) kernel[i].alloc(kernelSize, kernelSize, inChannelNum).rands(-1, 1);
+		stride			= _stride; 
+		kernel = (Tensor<>*)calloc(outChannelNum, sizeof(Tensor<>));
+		for (int i = 0; i < outChannelNum; i++) kernel[i].alloc(kernelSize, kernelSize, inChannelNum).rands(-1, 1); 
 		if (isBias) bias.rands(outChannelNum, 1, -1, 1);
 	}
 	/*----------------[ forward ]----------------*/
@@ -173,8 +173,8 @@ public:
 			(in.dim[0] - kernel[0].dim[0] + 2 * padding) / stride + 1,
 			(in.dim[1] - kernel[0].dim[1] + 2 * padding) / stride + 1,
 			outChannelNum
-		);
-		for (int i = 0; i < out.size(); i++)
+		); 
+		for (int i = 0; i < out.size(); i++){
 			for (int k = 0; k < kernel[out.i2z(i)].size(); k++) {
 				int xi = -padding + out.i2x(i) * stride + kernel[out.i2z(i)].i2x(k),
 					yi = -padding + out.i2y(i) * stride + kernel[out.i2z(i)].i2y(k),
@@ -182,11 +182,12 @@ public:
 				if (xi < 0 || xi >= in.dim[0] || yi < 0 || yi >= in.dim[1]) continue;
 				out(i) += in(xi, yi, zi) * kernel[out.i2z(i)](k);
 			}
+		}
 		if (isBias) for (int i = 0; i < out.size(); i++) out[i] += bias[out.i2z(i)];
 		return &out;
 	}
 	/*----------------[ backward ]----------------*/
-	void backword(Tensor<>& preIn, Tensor<>& error, double learnRate = 0.01) {
+	void backward(Tensor<>& preIn, Tensor<>& error, double learnRate) {
 		Tensor<> delta; delta.alloc(kernel[0].dim);
 		// delta = x * error
 		for (int i = 0; i < delta.size(); i++)
@@ -270,7 +271,7 @@ public:
 		return &out;
 	}
 	/*----------------[ backward ]----------------*/
-	void backward(Tensor<>& preIn, Tensor<>& error, double learnRate = 0.01) {
+	void backward(Tensor<>& preIn, Tensor<>& error, double learnRate) {
 		switch (poolType) {
 		case A:
 			break;
@@ -605,12 +606,12 @@ public:
 	}
 	/*----------------[ save/load ]----------------*/
 	void save(const char* saveFile) {
-		FILE* file = fopen(saveFile, "w+");
+		FILE* file = fopen(saveFile, "w");
 		for (int i = 0; i < layer.size(); i++) layer[i]->save(file);
 		fclose(file);
 	}
 	void load(const char* loadFile) {
-		FILE* file = fopen(loadFile, "r+");
+		FILE* file = fopen(loadFile, "r");
 		for (int i = 0; i < layer.size(); i++) layer[i]->load(file);
 		fclose(file);
 	}
@@ -631,15 +632,18 @@ public:
 		FullConnect_1{ 32 * 7 * 7, 128 }, 
 		FullConnect_2{ 128, 64 }, 
 		FullConnect_3{  64, 10 };
+	Mat<>& (*lossFunc)(Mat<>& y, Mat<>& target, Mat<>& error) = QuadraticLossFuncD;
+	Tensor<> preIn;
 	LeNet() { ; }
 	/*----------------[ forward ]----------------*/
 	Mat<>& operator()(Tensor<>& in, Mat<>& out) { return forward(in, out); }
-	Mat<>& forward(Tensor<>& in, Mat<>& out) {
-		Tensor<>* y;
-		y = MaxPool_1(*Conv_1(in));
-		y = MaxPool_2(*Conv_2(*y));
-		Tensor<> t = *y;
-		Mat<> t2(t.dim.product()); t2.data = t.data; t.data = NULL;
+	Mat<>& forward   (Tensor<>& in, Mat<>& out) {
+		preIn = in;
+		Tensor<>* y; 
+		y = MaxPool_1(*Conv_1(in)); 
+		y = MaxPool_2(*Conv_2(*y)); 
+		Tensor<> t = *y; 
+		Mat<> t2(t.size()); t2.data = t.data; t.data = NULL;
 		Mat<>* maty = &t2;
 		maty = FullConnect_1(*maty);
 		maty = FullConnect_2(*maty);
@@ -647,9 +651,19 @@ public:
 		return out = *maty;
 	}
 	/*----------------[ backward ]----------------*/
+	void backward(Mat<>& target, double learnRate = 0.01) {
+		Mat<> error;
+		lossFunc(FullConnect_3.out, target, error);
+		FullConnect_3.backward(FullConnect_2.out, error, learnRate);
+		FullConnect_2.backward(FullConnect_1.out, error, learnRate);
+		FullConnect_1.backward(FullConnect_1.out, error, learnRate);
+		Tensor<> error2;
+		MaxPool_2.backward(Conv_2.out, error2, learnRate);	Conv_2.backward(MaxPool_1.out, error2, learnRate);
+		MaxPool_1.backward(Conv_1.out, error2, learnRate);	Conv_1.backward(preIn,         error2, learnRate);
+	}
 	/*----------------[ save/load ]----------------*/
 	void save(const char* saveFile) {
-		FILE* file = fopen(saveFile, "w+");
+		FILE* file = fopen(saveFile, "w");
 		Conv_1.		  save(file);
 		Conv_2.		  save(file);
 		FullConnect_1.save(file);
@@ -658,7 +672,7 @@ public:
 		fclose(file);
 	}
 	void load(const char* loadFile) {
-		FILE* file = fopen(loadFile, "r+");
+		FILE* file = fopen(loadFile, "r");
 		Conv_1.		  load(file);
 		Conv_2.		  load(file);
 		FullConnect_1.load(file);
@@ -711,7 +725,7 @@ public:
 	}
 	/*----------------[ save/load ]----------------*/
 	void save(const char* saveFile) {
-		FILE* file = fopen(saveFile, "w+");
+		FILE* file = fopen(saveFile, "w");
 		preLayers.save(file);
 		a3.save(file); b3.save(file);
 		a4.save(file); b4.save(file); c4.save(file); d4.save(file); e4.save(file);
@@ -720,7 +734,7 @@ public:
 		fclose(file);
 	}
 	void load(const char* loadFile) {
-		FILE* file = fopen(loadFile, "r+");
+		FILE* file = fopen(loadFile, "r");
 		preLayers.load(file);
 		a3.load(file); b3.load(file);
 		a4.load(file); b4.load(file); c4.load(file); d4.load(file); e4.load(file);

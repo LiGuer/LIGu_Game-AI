@@ -5,13 +5,6 @@ int main() {
 	GraphicsFileCode::ppmRead ("C:/Users/ÐÜè÷ºÀ/Desktop/76543.ppm");
 	GraphicsFileCode::ppmWrite("C:/Users/ÐÜè÷ºÀ/Desktop/76543.ppm");
 
-
-
-
-
-
-
-
 	LeNet_NeuralNetworks nn;
 	nn.load("parameter.txt");
 	Tensor<float> input(28, 28, 1);
