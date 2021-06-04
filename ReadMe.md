@@ -3,7 +3,7 @@ An AI named 黛玉.
 ## [0].算法
 * 文件:  
 <NeuralNetworks.h>			神经网络算法   
-<MiniMax.h>				MiniMax算法  
+<MiniMax.h>					MiniMax算法  
 <MontecarloTreeSearch.h> 	Montecarlo树搜索算法  
 ### <NeuralNetworks.h> 神经网络类
 ```

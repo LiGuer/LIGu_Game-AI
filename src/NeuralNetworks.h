@@ -134,82 +134,102 @@ public:
 /*************************************************************************************************
 *							Convolution Layer	卷积层
 *	[输入]: kernel: 卷积核		padding: 加边框宽度		in/outChannelNum: 输入/输出通道数
-*	[]:
+*	[参数]:
 		Height_out = (Height_in - Height_kernel + 2 * padding) / (stride + 1)
 		 Width_out = ( Width_in -  Width_kernel + 2 * padding) / (stride + 1)
 -------------------------------------------------------------------------------------------------
 *	[正向传播]: 卷积操作
-		y_lij = Σ_(p=1)^sΣ_(q=1)^s  x_l(i+p-1)(j+q-1) × k_lpq + b_l
-		y = x * k + b
+		x * k = Σ_(c=1)^(xChannelNum) Σ_(p=1)^H Σ_(q=1)^W  x_{c,i+p-1,j+q-1} × k_cpq
+		y_c = x * k[c] + b[c]
+		y   = {y_1, y_2, ... , y_n}
 -------------------------------------------------------------------------------------------------
 *	[反向传播]:
-		∂E    /∂k_lpq = Σ_i Σ_j ∂E/∂y_lij·∂y_lij/∂k_lpq
-		∂y_lij/∂k_lpq = x_l(i+p-1)(j+q-1)
-		∴∂E/∂k_lpq = Σ_i Σ_j ∂E/∂y_lij·x_l(i+p-1)(j+q-1)
-		  ∂E/∂b_l   = Σ_i Σ_j ∂E/∂y_lij
+		∂E / ∂y_l = ∂E / ∂y_L·(∂y_L . ∂y_(L-1))·...·(∂y_(l+1) / ∂y_l) 
+				  = δ_l = δ_(l+1)·(∂y_(l+1) / ∂x_(l+1)) 
+		          = δ_(l-1) * Rot180(w_l)
+		∂E / ∂k_l = ∂E / ∂y_l·∂y_l / ∂k_l = δ_l·∂y_l / ∂k_l
+		          = δ_l * x_l
+		∂E / ∂b_l = δ_l·∂y_l / ∂b_l = Σ_x Σ_y δ_l
 *************************************************************************************************/
 class ConvLayer {
 public:
-	Tensor<> *kernel, out;
+	Tensor<> kernel, out;
 	Mat<> bias; bool isBias = true;
-	int outChannelNum, padding, stride;
+	int padding, stride;
 	/*----------------[ init ]----------------*/
 	ConvLayer() { ; }
-	ConvLayer(int inChannelNum, int _outChannelNum, int kernelSize, int _padding, int _stride) {
-		init(inChannelNum, _outChannelNum, kernelSize, _padding, _stride);
+	ConvLayer(int inChannelNum, int outChannelNum, int kernelSize, int _padding, int _stride) {
+		init(inChannelNum, outChannelNum, kernelSize, _padding, _stride);
 	}
-	void init(int inChannelNum, int _outChannelNum, int kernelSize, int _padding, int _stride) {
-		outChannelNum	= _outChannelNum, 
+	void init(int inChannelNum, int outChannelNum, int kernelSize, int _padding, int _stride) {
 		padding			= _padding, 
 		stride			= _stride; 
-		kernel = (Tensor<>*)calloc(outChannelNum, sizeof(Tensor<>));
-		for (int i = 0; i < outChannelNum; i++) kernel[i].alloc(kernelSize, kernelSize, inChannelNum).rands(-1, 1); 
+		kernel.alloc(kernelSize, kernelSize, inChannelNum, outChannelNum).rands(-1, 1);
 		if (isBias) bias.rands(outChannelNum, 1, -1, 1);
 	}
 	/*----------------[ forward ]----------------*/
 	Tensor<>* operator()(Tensor<>& in) { return forward(in); }
 	Tensor<>* forward   (Tensor<>& in) {
 		out.zero(
-			(in.dim[0] - kernel[0].dim[0] + 2 * padding) / stride + 1,
-			(in.dim[1] - kernel[0].dim[1] + 2 * padding) / stride + 1,
-			outChannelNum
+			(in.dim[0] - kernel.dim[0] + 2 * padding) / stride + 1,
+			(in.dim[1] - kernel.dim[1] + 2 * padding) / stride + 1,
+			kernel[3]
 		); 
-		for (int i = 0; i < out.size(); i++){
-			for (int k = 0; k < kernel[out.i2z(i)].size(); k++) {
-				int xi = -padding + out.i2x(i) * stride + kernel[out.i2z(i)].i2x(k),
-					yi = -padding + out.i2y(i) * stride + kernel[out.i2z(i)].i2y(k),
-					zi =                                  kernel[out.i2z(i)].i2z(k);
+		for (int i = 0; i < out.size(); i++)
+			for (int k = 0; k < kernel.size() / kernel.dim[3]; k++) {
+				int xi = -padding + out.i2x(i) * stride + kernel.i2x(k),
+					yi = -padding + out.i2y(i) * stride + kernel.i2y(k),
+					zi =                                  kernel.i2z(k);
 				if (xi < 0 || xi >= in.dim[0] || yi < 0 || yi >= in.dim[1]) continue;
-				out(i) += in(xi, yi, zi) * kernel[out.i2z(i)](k);
+				out(i) += in(xi, yi, zi) * kernel(k + i * kernel.size(3));
 			}
-		}
 		if (isBias) for (int i = 0; i < out.size(); i++) out[i] += bias[out.i2z(i)];
 		return &out;
 	}
 	/*----------------[ backward ]----------------*/
 	void backward(Tensor<>& preIn, Tensor<>& error, double learnRate) {
-		Tensor<> delta; delta.alloc(kernel[0].dim);
-		// delta = x * error
+		// δ_(l-1)
+		static Tensor<> delta; delta = error;
+		error.zero(
+			(delta.dim[0] - kernel.dim[0] + 2 * padding) / stride + 1,
+			(delta.dim[1] - kernel.dim[1] + 2 * padding) / stride + 1,
+			kernel.dim[2]
+		);
+		for (int i = 0; i < error.size(); i++)
+			for (int k = 0; k < kernel.size() / kernel.dim[3]; k++) {
+				int xi = -padding + error.i2x(i) * stride + kernel.i2x(preIn.size() - 1 - k),
+					yi = -padding + error.i2y(i) * stride + kernel.i2y(preIn.size() - 1 - k),
+					zi =                                    kernel.i2z(preIn.size() - 1 - k);
+				if (xi < 0 || xi >= delta.dim[0] || yi < 0 || yi >= delta.dim[1]) continue;
+				error(i) += delta(xi, yi, zi) * kernel(k + i * kernel.size(3));
+			}
+		// ∂E / ∂k_l
+		static Tensor<> deltaKernel; deltaKernel.alloc(kernel.dim);
 		for (int i = 0; i < delta.size(); i++)
-			for (int zi = 0; zi < preIn.dim[2]; zi++)
-				for (int k = 0; k < error.dim[0] * error.dim[1]; k++) {
-					int xi = -padding + out.i2x(i) * stride + error.i2x(k),
-						yi = -padding + out.i2y(i) * stride + error.i2y(k);
-					if (xi < 0 || xi >= preIn.dim[0] || yi < 0 || yi >= preIn.dim[1]) continue;
-					delta(i) += preIn(xi, yi, zi) * error(error.i2x(k), error.i2y(k), out.i2z(i));
-				}
-		delta  *= learnRate;
-		kernel[0] += delta;
+			for (int k = 0; k < preIn.size() / preIn.dim[3]; k++) {
+				int xi = -padding + delta.i2x(i) * stride + preIn.i2x(k),
+					yi = -padding + delta.i2y(i) * stride + preIn.i2y(k),
+					zi =                                    preIn.i2z(k);
+				if (xi < 0 || xi >= delta.dim[0] || yi < 0 || yi >= delta.dim[1]) continue;
+				delta(i) += delta(xi, yi, zi) * preIn(k + i * preIn.size(3));
+			}
+		kernel += (delta *= learnRate);
+		// ∂E / ∂b_l
+		static Mat<> deltaBias;  deltaBias.alloc(bias.size());
+		for (int i = 0; i < deltaBias.size(); i++) {
+			deltaBias[i] = 0;
+			for (int j = 0; j < delta.size(2); j++) deltaBias[i] += delta(j + i * delta.size(2));
+		} bias += (deltaBias *= learnRate);
 	}
 	/*----------------[ save / load ]----------------*/
 	void save(FILE* file) {
-		for (int i = 0; i < outChannelNum; i++) for (int k = 0; k < kernel[i].size(); k++) fprintf(file, "%f ", kernel[i][k]);
-		if(isBias) for (int i = 0; i < bias.size(); i++)                                   fprintf(file, "%f ", bias  [i]);
+		for (int i = 0; i < kernel.size(); i++)			 fprintf(file, "%f ", kernel[i]);
+		if(isBias) for (int i = 0; i < bias.size(); i++) fprintf(file, "%f ", bias  [i]);
 		fprintf(file, "\n");
 	}
 	void load(FILE* file) {
-		for (int i = 0; i < outChannelNum; i++) for (int k = 0; k < kernel[i].size(); k++) fscanf(file, "%lf", &kernel[i][k]);
-		if(isBias) for (int i = 0; i < bias.size(); i++)                                   fscanf(file, "%lf", &bias  [i]);
+		for (int i = 0; i < kernel.size(); i++)			 fscanf(file, "%lf", &kernel[i]);
+		if(isBias) for (int i = 0; i < bias.size(); i++) fscanf(file, "%lf", &bias  [i]);
 	}
 };
 /*************************************************************************************************
