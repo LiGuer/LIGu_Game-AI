@@ -143,7 +143,7 @@ public:
 		y_c = x * k[c] + b[c]
 		y   = {y_1, y_2, ... , y_n}
 -------------------------------------------------------------------------------------------------
-*	[反向传播]:
+*	[反向传播]: 卷积操作
 		∂E / ∂y_l = ∂E / ∂y_L·(∂y_L . ∂y_(L-1))·...·(∂y_(l+1) / ∂y_l) 
 				  = δ_l = δ_(l+1)·(∂y_(l+1) / ∂x_(l+1)) 
 		          = δ_(l-1) * Rot180(w_l)
@@ -181,7 +181,7 @@ public:
 					yi = -padding + out.i2y(i) * stride + kernel.i2y(k),
 					zi =                                  kernel.i2z(k);
 				if (xi < 0 || xi >= in.dim[0] || yi < 0 || yi >= in.dim[1]) continue;
-				out(i) += in(xi, yi, zi) * kernel(k + i * kernel.size(3));
+				out(i) += in(xi, yi, zi) * kernel(k + zi * kernel.size(3));
 			}
 		if (isBias) for (int i = 0; i < out.size(); i++) out[i] += bias[out.i2z(i)];
 		return &out;
@@ -197,25 +197,25 @@ public:
 					yi = -padding + error.i2y(i) * stride + kernel.i2y(kernel.size(3) - 1 - k),
 					zi =                                    kernel.i2z(kernel.size(3) - 1 - k);
 				if (xi < 0 || xi >= delta.dim[0] || yi < 0 || yi >= delta.dim[1]) continue;
-				error(i) += delta(xi, yi, zi) * kernel(kernel.size(3) - 1 - k + i * kernel.size(3));
+				error(i) += delta(xi, yi, zi) * kernel(kernel.size(3) - 1 - k + zi * kernel.size(3));
 			}
 		// ∂E / ∂k_l
 		static Tensor<> deltaKernel; deltaKernel.alloc(kernel.dim);
-		for (int i = 0; i < delta.size(); i++)
+		for (int i = 0; i < deltaKernel.size(); i++)
 			for (int k = 0; k < preIn.size() / preIn.dim[3]; k++) {
-				int xi = -padding + delta.i2x(i) * stride + preIn.i2x(k),
-					yi = -padding + delta.i2y(i) * stride + preIn.i2y(k),
-					zi =                                    preIn.i2z(k);
+				int xi = -padding + deltaKernel.i2x(i) * stride + preIn.i2x(k),
+					yi = -padding + deltaKernel.i2y(i) * stride + preIn.i2y(k),
+					zi =                                          preIn.i2z(k);
 				if (xi < 0 || xi >= delta.dim[0] || yi < 0 || yi >= delta.dim[1]) continue;
-				delta(i) += delta(xi, yi, zi) * preIn(k + i * preIn.size(3));
+				deltaKernel(i) += delta(xi, yi, zi) * preIn(k + zi * preIn.size(3));
 			}
-		kernel += (delta *= learnRate);
+		kernel += (deltaKernel *= learnRate); 
 		// ∂E / ∂b_l
 		static Mat<> deltaBias;  deltaBias.alloc(bias.size());
 		for (int i = 0; i < deltaBias.size(); i++) {
 			deltaBias[i] = 0;
 			for (int j = 0; j < delta.size(2); j++) deltaBias[i] += delta(j + i * delta.size(2));
-		} bias += (deltaBias *= learnRate);
+		} bias += (deltaBias *= learnRate); 
 	}
 	/*----------------[ save / load ]----------------*/
 	void save(FILE* file) {
@@ -675,14 +675,12 @@ public:
 	}
 	/*----------------[ backward ]----------------*/
 	void backward(Mat<>& target, double learnRate = 0.01) {
-		Mat<> error;
+		static Mat<> error, tmp(MaxPool_2.out.size()); tmp.data = MaxPool_2.out.data;
 		lossFunc(FullConnect_3.out, target, error);
 		FullConnect_3.backward(FullConnect_2.out, error, learnRate);
 		FullConnect_2.backward(FullConnect_1.out, error, learnRate);
-		FullConnect_1.backward(FullConnect_1.out, error, learnRate);
-		printf("<>");
+		FullConnect_1.backward(tmp, error, learnRate);
 		Tensor<> error2(7, 7, 32); free(error2.data); error2.data = error.data; error.data = NULL; error.zero(1);
-		printf("<>");
 		MaxPool_2.backward(Conv_2.out, error2);	Conv_2.backward(MaxPool_1.out, error2, learnRate);
 		MaxPool_1.backward(Conv_1.out, error2);	Conv_1.backward(preIn,         error2, learnRate);
 	}
