@@ -173,7 +173,7 @@ public:
 		out.zero(
 			(in.dim[0] - kernel.dim[0] + 2 * padding) / stride + 1,
 			(in.dim[1] - kernel.dim[1] + 2 * padding) / stride + 1,
-			kernel[3]
+			kernel.dim[3]
 		); 
 		for (int i = 0; i < out.size(); i++)
 			for (int k = 0; k < kernel.size() / kernel.dim[3]; k++) {
@@ -190,18 +190,14 @@ public:
 	void backward(Tensor<>& preIn, Tensor<>& error, double learnRate) {
 		// δ_(l-1)
 		static Tensor<> delta; delta = error;
-		error.zero(
-			(delta.dim[0] - kernel.dim[0] + 2 * padding) / stride + 1,
-			(delta.dim[1] - kernel.dim[1] + 2 * padding) / stride + 1,
-			kernel.dim[2]
-		);
+		error.alloc(preIn.dim).zero();
 		for (int i = 0; i < error.size(); i++)
 			for (int k = 0; k < kernel.size() / kernel.dim[3]; k++) {
-				int xi = -padding + error.i2x(i) * stride + kernel.i2x(preIn.size() - 1 - k),
-					yi = -padding + error.i2y(i) * stride + kernel.i2y(preIn.size() - 1 - k),
-					zi =                                    kernel.i2z(preIn.size() - 1 - k);
+				int xi = -padding + error.i2x(i) * stride + kernel.i2x(kernel.size(3) - 1 - k),
+					yi = -padding + error.i2y(i) * stride + kernel.i2y(kernel.size(3) - 1 - k),
+					zi =                                    kernel.i2z(kernel.size(3) - 1 - k);
 				if (xi < 0 || xi >= delta.dim[0] || yi < 0 || yi >= delta.dim[1]) continue;
-				error(i) += delta(xi, yi, zi) * kernel(k + i * kernel.size(3));
+				error(i) += delta(xi, yi, zi) * kernel(kernel.size(3) - 1 - k + i * kernel.size(3));
 			}
 		// ∂E / ∂k_l
 		static Tensor<> deltaKernel; deltaKernel.alloc(kernel.dim);
@@ -241,10 +237,8 @@ public:
 		AvePool: 平均值
 -------------------------------------------------------------------------------------------------
 *	[反向传播]:
-		MaxPool:
-			区域最大值对应的位置误差为δ，而其它位置误差为0
-		AvePool:
-			区域每个位置的误差为采样后误差除以区域大小
+		MaxPool: 区域最大值对应的位置误差为δ，而其它位置误差为0
+		AvePool: 区域每个位置的误差为采样后误差除以区域大小
 *************************************************************************************************/
 class PoolLayer {
 public:
@@ -262,41 +256,50 @@ public:
 	/*----------------[ forward ]----------------*/
 	Tensor<>* operator()(Tensor<>& in) { return forward(in); }
 	Tensor<>* forward   (Tensor<>& in) {
-		int rows_out = (in.dim[0] - kernelSize + 2 * padding) / stride + 1,
-			cols_out = (in.dim[1] - kernelSize + 2 * padding) / stride + 1;
-		out.zero(rows_out, cols_out, in.dim[2]);
-		// for each element of out
-		for (int z = 0; z < out.dim[2]; z++) {
-			for (int y = 0; y < out.dim[1]; y++) {
-				for (int x = 0; x < out.dim[0]; x++) {
-					// for each element of kernel
-					for (int ky = 0; ky < kernelSize; ky++) {
-						for (int kx = 0; kx < kernelSize; kx++) {
-							double t;
-							// get the corresponding element of in
-							int xt = -padding + x * stride + kx, 
-								yt = -padding + y * stride + ky;
-							if (xt < 0 || xt >= in.dim[0] || yt < 0 || yt >= in.dim[1]) t = 0;
-							else t = in(xt, yt, z);
-							switch (poolType) {
-							case A: out(x, y, z) += t; break;
-							case M: out(x, y, z)  = t > out(x, y, z) ? t : out(x, y, z); break;
-							}
-						}
-					}
+		out.zero(
+			(in.dim[0] - kernelSize + 2 * padding) / stride + 1,
+			(in.dim[1] - kernelSize + 2 * padding) / stride + 1,
+			 in.dim[2]
+		);
+		for (int i = 0; i < out.size(); i++)
+			for (int k = 0; k < kernelSize * kernelSize; k++) {
+				int xt = -padding + out.i2x(i) * stride + k % kernelSize,
+					yt = -padding + out.i2y(i) * stride + k / kernelSize,
+					zt =            out.i2z(i);
+				if (xt < 0 || xt >= in.dim[0] || yt < 0 || yt >= in.dim[1]) continue;
+				switch (poolType) {
+				case A: out(i) += in(xt, yt, zt); break;
+				case M: out(i)  = in(xt, yt, zt) > out(i) ? in(xt, yt, zt) : out(i); break;
 				}
 			}
-		}
-		if (poolType == A) out.mul(1.0 / (kernelSize * kernelSize), out);
+		if (poolType == A) out *= 1.0 / (kernelSize * kernelSize);
 		return &out;
 	}
 	/*----------------[ backward ]----------------*/
-	void backward(Tensor<>& preIn, Tensor<>& error, double learnRate) {
-		switch (poolType) {
-		case A:
-			break;
-		case M: 
-			break;
+	void backward(Tensor<>& preIn, Tensor<>& error) {
+		static Tensor<> delta; delta = error;
+		error.alloc(preIn.dim).zero();
+		if (poolType == A) {
+			for (int i = 0; i < error.size(); i++)
+				for (int k = 0; k < kernelSize * kernelSize; k++) {
+					int xt = -padding + out.i2x(i) * stride + k % kernelSize,
+						yt = -padding + out.i2y(i) * stride + k / kernelSize,
+						zt =            out.i2z(i);
+					if (xt < 0 || xt >= delta.dim[0] || yt < 0 || yt >= delta.dim[1]) continue;
+					error(i) += delta(xt, yt, zt) / (kernelSize * kernelSize);
+				}
+		}
+		if (poolType == M) {
+			for (int i = 0; i < delta.size(); i++) {
+				double maxn = -DBL_MAX; int maxIndex;
+				for (int k = 0; k < kernelSize * kernelSize; k++) {
+					int xt = -padding + delta.i2x(i) * stride + k % kernelSize,
+						yt = -padding + delta.i2y(i) * stride + k / kernelSize,
+						zt =            delta.i2z(i);
+					if (xt < 0 || xt >= preIn.dim[0] || yt < 0 || yt >= preIn.dim[1]) continue;
+					if (preIn(xt, yt, zt) > maxn) maxn = preIn(xt, yt, zt), maxIndex = xt * yt * zt;
+				} error(maxIndex) = delta(i);
+			}
 		}
 	}
 };
@@ -677,9 +680,11 @@ public:
 		FullConnect_3.backward(FullConnect_2.out, error, learnRate);
 		FullConnect_2.backward(FullConnect_1.out, error, learnRate);
 		FullConnect_1.backward(FullConnect_1.out, error, learnRate);
-		Tensor<> error2;
-		MaxPool_2.backward(Conv_2.out, error2, learnRate);	Conv_2.backward(MaxPool_1.out, error2, learnRate);
-		MaxPool_1.backward(Conv_1.out, error2, learnRate);	Conv_1.backward(preIn,         error2, learnRate);
+		printf("<>");
+		Tensor<> error2(7, 7, 32); free(error2.data); error2.data = error.data; error.data = NULL; error.zero(1);
+		printf("<>");
+		MaxPool_2.backward(Conv_2.out, error2);	Conv_2.backward(MaxPool_1.out, error2, learnRate);
+		MaxPool_1.backward(Conv_1.out, error2);	Conv_1.backward(preIn,         error2, learnRate);
 	}
 	/*----------------[ save/load ]----------------*/
 	void save(const char* saveFile) {
