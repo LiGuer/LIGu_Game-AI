@@ -661,26 +661,21 @@ public:
 	/*----------------[ forward ]----------------*/
 	Mat<>& operator()(Tensor<>& in, Mat<>& out) { return forward(in, out); }
 	Mat<>& forward   (Tensor<>& in, Mat<>& out) {
-		preIn = in;
-		Tensor<>* y; 
+		Tensor<>* y; preIn = in;
 		y = MaxPool_1(*Conv_1(in)); 
-		y = MaxPool_2(*Conv_2(*y)); 
-		Tensor<> t = *y; 
-		Mat<> t2(t.size()); t2.data = t.data; t.data = NULL;
-		Mat<>* maty = &t2;
-		maty = FullConnect_1(*maty);
-		maty = FullConnect_2(*maty);
-		maty = FullConnect_3(*maty);
-		return out = *maty;
+		y = MaxPool_2(*Conv_2(*y));
+		static Mat<> y2; y2.rows = y->size(); y2.cols = 1;  y2.data = y->data;
+		return out = *FullConnect_3(*FullConnect_2(*FullConnect_1(y2)));
 	}
 	/*----------------[ backward ]----------------*/
 	void backward(Mat<>& target, double learnRate = 0.01) {
-		static Mat<> error, tmp(MaxPool_2.out.size()); tmp.data = MaxPool_2.out.data;
+		static Mat<> error, tmp; tmp.rows = MaxPool_2.out.size(); tmp.cols = 1; tmp.data = MaxPool_2.out.data;
 		lossFunc(FullConnect_3.out, target, error);
 		FullConnect_3.backward(FullConnect_2.out, error, learnRate);
 		FullConnect_2.backward(FullConnect_1.out, error, learnRate);
-		FullConnect_1.backward(tmp, error, learnRate);
-		Tensor<> error2(7, 7, 32); free(error2.data); error2.data = error.data; error.data = NULL; error.zero(1);
+		FullConnect_1.backward(tmp, error, learnRate); 
+		static Tensor<> error2; Mat<int> tmp2; error2.dim = (tmp2.alloc(3).getData(7, 7, 32)); 
+		if(error2.data!=NULL) delete error2.data; error2.data = error.data; error.data = NULL;
 		MaxPool_2.backward(Conv_2.out, error2);	Conv_2.backward(MaxPool_1.out, error2, learnRate);
 		MaxPool_1.backward(Conv_1.out, error2);	Conv_1.backward(preIn,         error2, learnRate);
 	}
