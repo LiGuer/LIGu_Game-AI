@@ -45,7 +45,7 @@ double sigmoidD	(double x) { return sigmoid(x) * (1 - sigmoid(x)); }
 double QuadraticLossFunc(Mat<>& y, Mat<>& target) {
 	Mat<> t; return t.sub(y, target).dot(t);
 }
-Mat<>& QuadraticLossFuncD(Mat<>& y, Mat<>& target, Mat<>& error) { return error.mul(-2, error.sub(target, target)); }
+Mat<>& QuadraticLossFuncD(Mat<>& y, Mat<>& target, Mat<>& error) { return error.mul(-2, error.sub(target, y)); }
 /*************************************************************************************************
 *							NeuralLayer	神经网络层
 *	[核心数据]: 
@@ -107,15 +107,13 @@ public:
 	}
 	/*----------------[ forward ]----------------*/
 	Mat<>* operator()(Mat<>& in) { return forward(in); }
-	Mat<>* forward   (Mat<>& in) {
-		return &out.function(z.add(z.mul(weight, in), bias), actFunc);
-	}
+	Mat<>* forward   (Mat<>& in) { return &out.function(z.add(z.mul(weight, in), bias), actFunc); }
 	/*----------------[ backward ]----------------*/
 	void backward(Mat<>& preIn, Mat<>& error, double learnRate) {
 		static Mat<> t, delta;
 		error.mul(
 			weight.transpose(t), 
-			delta.elementMul(error, delta.function(z, actDerivFunc))
+			delta.function(z, actDerivFunc).elementMul(error)
 		);
 		weight += t.mul(-learnRate, t.mul(delta, preIn.transpose(t)));
 		bias   += t.mul(-learnRate, delta);
@@ -175,47 +173,49 @@ public:
 			(in.dim[1] - kernel.dim[1] + 2 * padding) / stride + 1,
 			kernel.dim[3]
 		); 
-		for (int i = 0; i < out.size(); i++)
-			for (int k = 0; k < kernel.size() / kernel.dim[3]; k++) {
+		for (int i = 0; i < out.size(); i++) {
+			for (int k = 0; k < kernel.size(3); k++) {
 				int xi = -padding + out.i2x(i) * stride + kernel.i2x(k),
 					yi = -padding + out.i2y(i) * stride + kernel.i2y(k),
 					zi =                                  kernel.i2z(k);
 				if (xi < 0 || xi >= in.dim[0] || yi < 0 || yi >= in.dim[1]) continue;
 				out(i) += in(xi, yi, zi) * kernel(k + zi * kernel.size(3));
-			}
-		if (isBias) for (int i = 0; i < out.size(); i++) out[i] += bias[out.i2z(i)];
-		return &out;
+			} if (isBias) out[i] += bias[out.i2z(i)];
+		} return &out;
 	}
 	/*----------------[ backward ]----------------*/
 	void backward(Tensor<>& preIn, Tensor<>& error, double learnRate) {
 		// δ_(l-1)
-		static Tensor<> delta; delta = error;
+		static Tensor<> delta; delta.eat(error);
 		error.alloc(preIn.dim).zero();
 		for (int i = 0; i < error.size(); i++)
-			for (int k = 0; k < kernel.size() / kernel.dim[3]; k++) {
-				int xi = -padding + error.i2x(i) * stride + kernel.i2x(kernel.size(3) - 1 - k),
-					yi = -padding + error.i2y(i) * stride + kernel.i2y(kernel.size(3) - 1 - k),
-					zi =                                    kernel.i2z(kernel.size(3) - 1 - k);
-				if (xi < 0 || xi >= delta.dim[0] || yi < 0 || yi >= delta.dim[1]) continue;
-				error(i) += delta(xi, yi, zi) * kernel(kernel.size(3) - 1 - k + zi * kernel.size(3));
-			}
+			for (int zi = 0; zi < kernel.dim[3]; zi++)
+				for (int k = 0; k < kernel.size(2); k++) {
+					int xi = -padding + error.i2x(i) * stride + kernel.i2x(kernel.size(2) - 1 - k),
+						yi = -padding + error.i2y(i) * stride + kernel.i2y(kernel.size(2) - 1 - k);
+					if (xi < 0 || xi >= delta.dim[0] || yi < 0 || yi >= delta.dim[1]) continue;
+					error(i) += delta(xi, yi, zi) * kernel(kernel.size(2) - 1 - k + error.i2z(i) * kernel.size(2) + zi * kernel.size(3));
+				}
 		// ∂E / ∂k_l
-		static Tensor<> deltaKernel; deltaKernel.alloc(kernel.dim);
+		static Tensor<> deltaKernel; deltaKernel.alloc(kernel.dim).zero();
 		for (int i = 0; i < deltaKernel.size(); i++)
-			for (int k = 0; k < preIn.size() / preIn.dim[3]; k++) {
+			for (int k = 0; k < preIn.size(2); k++) {
 				int xi = -padding + deltaKernel.i2x(i) * stride + preIn.i2x(k),
 					yi = -padding + deltaKernel.i2y(i) * stride + preIn.i2y(k),
-					zi =                                          preIn.i2z(k);
+					zi =            deltaKernel.i2z(i),
+					zo =        i / deltaKernel.size(3);
 				if (xi < 0 || xi >= delta.dim[0] || yi < 0 || yi >= delta.dim[1]) continue;
-				deltaKernel(i) += delta(xi, yi, zi) * preIn(k + zi * preIn.size(3));
+				deltaKernel(i) += delta(xi, yi, zo) * preIn(k + zi * preIn.size(2));
 			}
-		kernel += (deltaKernel *= learnRate); 
+		kernel += (deltaKernel *= -learnRate); 
 		// ∂E / ∂b_l
-		static Mat<> deltaBias;  deltaBias.alloc(bias.size());
-		for (int i = 0; i < deltaBias.size(); i++) {
-			deltaBias[i] = 0;
-			for (int j = 0; j < delta.size(2); j++) deltaBias[i] += delta(j + i * delta.size(2));
-		} bias += (deltaBias *= learnRate); 
+		if (isBias) {
+			static Mat<> deltaBias;  deltaBias.alloc(bias.size());
+			for (int i = 0; i < deltaBias.size(); i++) {
+				deltaBias[i] = 0;
+				for (int j = 0; j < delta.size(2); j++) deltaBias[i] += delta(j + i * delta.size(2));
+			} bias += (deltaBias *= -learnRate); 
+		}
 	}
 	/*----------------[ save / load ]----------------*/
 	void save(FILE* file) {
@@ -277,7 +277,7 @@ public:
 	}
 	/*----------------[ backward ]----------------*/
 	void backward(Tensor<>& preIn, Tensor<>& error) {
-		static Tensor<> delta; delta = error;
+		static Tensor<> delta; delta.eat(error);
 		error.alloc(preIn.dim).zero();
 		if (poolType == A) {
 			for (int i = 0; i < error.size(); i++)
@@ -652,32 +652,32 @@ public:
 		MaxPool_1{ 2, 0, 2, MaxPool_1.M }, 
 		MaxPool_2{ 2, 0, 2, MaxPool_2.M };
 	NeuralLayer 
-		FullConnect_1{ 32 * 7 * 7, 128 }, 
-		FullConnect_2{ 128, 64 }, 
-		FullConnect_3{  64, 10 };
+		FullConnect_1{ 32 * 7 * 7, 128 , sigmoid, sigmoidD}, 
+		FullConnect_2{ 128, 64 , sigmoid, sigmoidD },
+		FullConnect_3{  64, 10 , sigmoid, sigmoidD };
 	Mat<>& (*lossFunc)(Mat<>& y, Mat<>& target, Mat<>& error) = QuadraticLossFuncD;
 	Tensor<> preIn;
 	LeNet() { ; }
 	/*----------------[ forward ]----------------*/
 	Mat<>& operator()(Tensor<>& in, Mat<>& out) { return forward(in, out); }
-	Mat<>& forward   (Tensor<>& in, Mat<>& out) {
+	Mat<>& forward   (Tensor<>& in, Mat<>& out) { 
 		Tensor<>* y; preIn = in;
 		y = MaxPool_1(*Conv_1(in)); 
 		y = MaxPool_2(*Conv_2(*y));
-		static Mat<> y2; y2.rows = y->size(); y2.cols = 1;  y2.data = y->data;
+		y->function(sigmoid); static Mat<> y2; y2.rows = y->size(); y2.cols = 1; y2.data = y->data; 
 		return out = *FullConnect_3(*FullConnect_2(*FullConnect_1(y2)));
 	}
 	/*----------------[ backward ]----------------*/
-	void backward(Mat<>& target, double learnRate = 0.01) {
-		static Mat<> error, tmp; tmp.rows = MaxPool_2.out.size(); tmp.cols = 1; tmp.data = MaxPool_2.out.data;
+	void backward(Mat<>& target, double learnRate = 0.01) { 
+		static Mat<> error, tmp; tmp.rows = MaxPool_2.out.size(); tmp.cols = 1; tmp.data = MaxPool_2.out.data; 
 		lossFunc(FullConnect_3.out, target, error);
 		FullConnect_3.backward(FullConnect_2.out, error, learnRate);
 		FullConnect_2.backward(FullConnect_1.out, error, learnRate);
 		FullConnect_1.backward(tmp, error, learnRate); 
-		static Tensor<> error2; Mat<int> tmp2; error2.dim = (tmp2.alloc(3).getData(7, 7, 32)); 
-		if(error2.data!=NULL) delete error2.data; error2.data = error.data; error.data = NULL;
+		static Tensor<> error2; error2.dim.alloc(3).getData(7, 7, 32); 
+		if (error2.data != NULL) delete error2.data; error2.data = error.data; error.data = NULL;
 		MaxPool_2.backward(Conv_2.out, error2);	Conv_2.backward(MaxPool_1.out, error2, learnRate);
-		MaxPool_1.backward(Conv_1.out, error2);	Conv_1.backward(preIn,         error2, learnRate);
+		MaxPool_1.backward(Conv_1.out, error2);	Conv_1.backward(preIn,         error2, learnRate); 
 	}
 	/*----------------[ save/load ]----------------*/
 	void save(const char* saveFile) {
