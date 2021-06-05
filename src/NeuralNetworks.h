@@ -18,17 +18,22 @@ limitations under the License.
 #include "../../LiGu_AlgorithmLib/Tensor.h"
 /*################################################################################################
 核心类:
-class NeuralLayer	(int inSize, int outSize)	//神经网络层
-class ConvLayer		(int inChannelNum, int outChannelNum,int kernelSize,int padding,int stride)	//卷积层
-class PoolLayer		(int kernelSize,   int padding, int stride, int poolType)					//下采样层
-class LstmLayer		(int inSize, int outSize)	//长短期记忆层
+class NeuralLayer	(inSize, outSize)											//神经网络层
+class ConvLayer		(inChannelNum, outChannelNum, kernelSize, padding, stride)	//卷积层
+class PoolLayer		(kernelSize, padding, stride, poolType)						//下采样层
+class LstmLayer		(inSize, outSize)											//长短期记忆层
+class BatchNorm		(outChannelNum, _eps)										//归一化层
 --------------------------------------------------------------------------------------------------
-经典结构:
-class BackPropagation_NeuralNetworks()				//反向传播神经网络 : 1986.Rumelhart,McClelland
-class LeNet_NeuralNetworks()						//LeNet卷积神经网络 : 1998.Yann LeCun
-class Inception()									//Inception模块 : 2014.Google
-class GoogLeNet_NeuralNetworks()					//GoogLeNet卷积神经网络 : 2014.Google
-class LstmNetwork()									//LSTM长短期记忆网络
+经典模块:
+class BasicConv		(inChannelNum, outChannelNum, kernelSize, padding, stride)			//基础卷积层
+class Inceptionn	(inChannelNum, n1x1, n3x3red, n3x3, n5x5red, n5x5, poolChannelNum)	//Inception模块 : 2014
+class ResBlock		(inChannelNum, ChannelNum, stride)									//残差模块 : 2015
+--------------------------------------------------------------------------------------------------
+经典网络:
+class BackPropagationNeuralNetworks()				//反向传播神经网络		: 1986.Rumelhart,McClelland
+class LeNet()										//LeNet卷积神经网络		: 1998.Yann LeCun
+class GoogLeNet()									//GoogLeNet卷积神经网络 : 2014.
+class LstmNetwork()									//长短期记忆网络
 ################################################################################################*/
 /*************************************************************************************************
 *							基础函数
@@ -42,9 +47,7 @@ double sigmoidD	(double x) { return sigmoid(x) * (1 - sigmoid(x)); }
 /*************************************************************************************************
 *							损失函数
 *************************************************************************************************/
-double QuadraticLossFunc(Mat<>& y, Mat<>& target) {
-	Mat<> t; return t.sub(y, target).dot(t);
-}
+double QuadraticLossFunc (Mat<>& y, Mat<>& target) { Mat<> t; return t.sub(y, target).dot(t); }
 Mat<>& QuadraticLossFuncD(Mat<>& y, Mat<>& target, Mat<>& error) { return error.mul(-2, error.sub(target, y)); }
 /*************************************************************************************************
 *							NeuralLayer	神经网络层
@@ -115,8 +118,8 @@ public:
 			weight.transpose(t), 
 			delta.function(z, actDerivFunc).elementMul(error)
 		);
-		weight += t.mul(-learnRate, t.mul(delta, preIn.transpose(t)));
-		bias   += t.mul(-learnRate, delta);
+		weight += t.mul(learnRate, t.mul(delta, preIn.transpose(t)));
+		bias   += t.mul(learnRate, delta);
 	}
 	/*----------------[ save/load ]----------------*/
 	void save(FILE* file) {
@@ -154,16 +157,20 @@ public:
 	Tensor<> kernel, out;
 	Mat<> bias; bool isBias = true;
 	int padding, stride;
+	double(*actFunc)     (double);
+	double(*actDerivFunc)(double);
 	/*----------------[ init ]----------------*/
 	ConvLayer() { ; }
-	ConvLayer(int inChannelNum, int outChannelNum, int kernelSize, int _padding, int _stride) {
-		init(inChannelNum, outChannelNum, kernelSize, _padding, _stride);
+	ConvLayer(int inChannelNum, int outChannelNum, int kernelSize, int _padding, int _stride, double(*_actFunc)(double), double(*_actDerivFunc)(double)) {
+		init(inChannelNum, outChannelNum, kernelSize, _padding, _stride, _actFunc, _actDerivFunc);
 	}
-	void init(int inChannelNum, int outChannelNum, int kernelSize, int _padding, int _stride) {
+	void init(int inChannelNum, int outChannelNum, int kernelSize, int _padding, int _stride, double(*_actFunc)(double), double(*_actDerivFunc)(double)) {
 		padding			= _padding, 
 		stride			= _stride; 
 		kernel.alloc(kernelSize, kernelSize, inChannelNum, outChannelNum).rands(-1, 1);
 		if (isBias) bias.rands(outChannelNum, 1, -1, 1);
+		actFunc      = _actFunc;
+		actDerivFunc = _actDerivFunc;
 	}
 	/*----------------[ forward ]----------------*/
 	Tensor<>* operator()(Tensor<>& in) { return forward(in); }
@@ -181,10 +188,13 @@ public:
 				if (xi < 0 || xi >= in.dim[0] || yi < 0 || yi >= in.dim[1]) continue;
 				out(i) += in(xi, yi, zi) * kernel(k + zi * kernel.size(3));
 			} if (isBias) out[i] += bias[out.i2z(i)];
+			out[i] = actFunc(out[i]);
 		} return &out;
 	}
 	/*----------------[ backward ]----------------*/
 	void backward(Tensor<>& preIn, Tensor<>& error, double learnRate) {
+		// σ'
+		error.function(actDerivFunc);
 		// δ_(l-1)
 		static Tensor<> delta; delta.eat(error);
 		error.alloc(preIn.dim).zero();
@@ -207,14 +217,14 @@ public:
 				if (xi < 0 || xi >= delta.dim[0] || yi < 0 || yi >= delta.dim[1]) continue;
 				deltaKernel(i) += delta(xi, yi, zo) * preIn(k + zi * preIn.size(2));
 			}
-		kernel += (deltaKernel *= -learnRate); 
+		kernel += (deltaKernel *= learnRate); 
 		// ∂E / ∂b_l
 		if (isBias) {
 			static Mat<> deltaBias;  deltaBias.alloc(bias.size());
 			for (int i = 0; i < deltaBias.size(); i++) {
 				deltaBias[i] = 0;
 				for (int j = 0; j < delta.size(2); j++) deltaBias[i] += delta(j + i * delta.size(2));
-			} bias += (deltaBias *= -learnRate); 
+			} bias += (deltaBias *= learnRate); 
 		}
 	}
 	/*----------------[ save / load ]----------------*/
@@ -276,7 +286,7 @@ public:
 		return &out;
 	}
 	/*----------------[ backward ]----------------*/
-	void backward(Tensor<>& preIn, Tensor<>& error) {
+	Tensor<>& backward(Tensor<>& preIn, Tensor<>& error) {
 		static Tensor<> delta; delta.eat(error);
 		error.alloc(preIn.dim).zero();
 		if (poolType == A) {
@@ -291,16 +301,16 @@ public:
 		}
 		if (poolType == M) {
 			for (int i = 0; i < delta.size(); i++) {
-				double maxn = -DBL_MAX; int maxIndex;
+				double maxn = -DBL_MAX; int maxIndex = 0;
 				for (int k = 0; k < kernelSize * kernelSize; k++) {
 					int xt = -padding + delta.i2x(i) * stride + k % kernelSize,
 						yt = -padding + delta.i2y(i) * stride + k / kernelSize,
-						zt =            delta.i2z(i);
+						zt = delta.i2z(i);
 					if (xt < 0 || xt >= preIn.dim[0] || yt < 0 || yt >= preIn.dim[1]) continue;
 					if (preIn(xt, yt, zt) > maxn) maxn = preIn(xt, yt, zt), maxIndex = xt * yt * zt;
-				} error(maxIndex) = delta(i);
+				} error(maxIndex) += delta(i);
 			}
-		}
+		} return error;
 	}
 };
 /*********************************************************************************
@@ -407,8 +417,8 @@ public:
 		}
 		//Update
 		for (int i = 0; i < 4; i++) {
-			weights[i] += (diffWeights[i] *= -learnRate);
-			bias   [i] += (diffBias   [i] *= -learnRate);
+			weights[i] += (diffWeights[i] *= learnRate);
+			bias   [i] += (diffBias   [i] *= learnRate);
 			diffWeights[i].zero();
 			diffBias   [i].zero();
 		}
@@ -469,6 +479,7 @@ public:
 	Tensor<>* forward   (Tensor<>& in) {
 	}
 	/*----------------[ backward ]----------------*/
+	void backward() { ; }
 };
 /*################################################################################################
 
@@ -490,14 +501,18 @@ public:
 		init(_inChannelNum, _outChannelNum, kernelSize, _padding, _stride);
 	}
 	void init(int _inChannelNum, int _outChannelNum, int kernelSize, int _padding, int _stride) {
-		conv.init(_inChannelNum, _outChannelNum, kernelSize, _padding, _stride);
+		conv.init(_inChannelNum, _outChannelNum, kernelSize, _padding, _stride, relu, reluD);
 		bn	.init(_outChannelNum, 0.001);
 	}
 	/*----------------[ forward ]----------------*/
 	Tensor<>* operator()(Tensor<>& in) { return forward(in); }
 	Tensor<>* forward   (Tensor<>& in) { (out = *bn(*conv(in))).function(relu); }
 	/*----------------[ backward ]----------------*/
-
+	void backward(Tensor<>& preIn, Tensor<>& error, double learnRate) {
+		error.function(reluD);
+		bn.  backward();
+		conv.backward(preIn, error, learnRate);
+	}
 	/*----------------[ save/load ]----------------*/
 	void save(FILE* file) { conv.save(file); }
 	void load(FILE* file) { conv.load(file); }
@@ -531,15 +546,17 @@ public:
 	/*----------------[ forward ]----------------*/
 	Tensor<>* operator()(Tensor<>& in) { return forward(in); }
 	Tensor<>* forward(Tensor<>& in) {
-		Tensor<>* y1 = b1								(in);
-		Tensor<>* y2 = b2_3x3_b(*b2_1x1_a				(in));
-		Tensor<>* y3 = b3_3x3_c(*b3_3x3_b(*b3_1x1_a	(in)));
-		Tensor<>* y4 = b4_1x1  (*b4_pool				(in));
-		Tensor<>* t[]{ y1, y2, y3, y4 };
-		return &out.merge(t, 4, 1);
+		Tensor<>* t[]{ 
+			b1							(in),
+			b2_3x3_b(*b2_1x1_a			(in)),
+			b3_3x3_c(*b3_3x3_b(*b3_1x1_a(in))),
+			b4_1x1  (*b4_pool			(in)) 
+		}; return &out.merge(t, 4, 1);
 	}
 	/*----------------[ backward ]----------------*/
+	void backward(Tensor<>& preIn, Tensor<>& error, double learnRate) {
 
+	}
 	/*----------------[ save/load ]----------------*/
 	void save(FILE* file) {
 		b1.		 save(file);
@@ -554,11 +571,11 @@ public:
 		b4_1x1.  load(file);
 	}
 };
-/*********************************************************************************
+/*************************************************************************************************
 						ResBlock 残差模块
 *	正向传播:
 		xList, nodeList: 保持运行过程数据, 在反向传播中使用
-*********************************************************************************/
+*************************************************************************************************/
 class ResBlock {
 public:
 	ConvLayer conv1, conv2;
@@ -567,10 +584,10 @@ public:
 	ResBlock() { ; }
 	ResBlock (int inChannelNum, int ChannelNum, int stride) { init(inChannelNum, ChannelNum, stride); }
 	void init(int inChannelNum, int ChannelNum, int stride) {
-		conv1.init(inChannelNum, ChannelNum, 3, 1, stride);
-		conv2.init(  ChannelNum, ChannelNum, 3, 1, 1);
-		bn1  .init(ChannelNum, 0.001);
-		bn2  .init(ChannelNum, 0.001);
+		conv1.init(inChannelNum, ChannelNum, 3, 1, stride, relu, reluD);
+		conv2.init(  ChannelNum, ChannelNum, 3, 1, 1,      relu, reluD);
+		bn1  .init(  ChannelNum, 0.001);
+		bn2  .init(  ChannelNum, 0.001);
 	}
 	/*----------------[ forward ]----------------*/
 	Tensor<>* operator()(Tensor<>& in) { return forward(in); }
@@ -580,7 +597,9 @@ public:
 		return &((out += in).function(relu));
 	}
 	/*----------------[ backward ]----------------*/
+	void backward(Tensor<>& preIn, Tensor<>& error, double learnRate) {
 
+	}
 	/*----------------[ save ]----------------*/
 	void save(FILE* file) { conv1.save(file); conv2.save(file); }
 	void load(FILE* file) { conv1.load(file); conv2.load(file); }
@@ -618,7 +637,7 @@ public:
 		return out = *y;
 	}
 	/*----------------[ backward ]----------------*/
-	void backward(Mat<>& target, double learnRate = 0.01) {
+	void backward(Mat<>& target, double learnRate = -0.01) {
 		Mat<> error; lossFunc(layer.back()->out, target, error);
 		for (int i = layer.size() - 1; i >= 0; i--)
 			layer[i]->backward(
@@ -646,15 +665,15 @@ public:
 class LeNet {
 public:
 	ConvLayer 
-		Conv_1{  1, 16, 5, 2, 1 }, 
-		Conv_2{ 16, 32, 5, 2, 1 };
+		Conv_1{  1, 16, 5, 2, 1, sigmoid, sigmoidD },
+		Conv_2{ 16, 32, 5, 2, 1, sigmoid, sigmoidD };
 	PoolLayer 
 		MaxPool_1{ 2, 0, 2, MaxPool_1.M }, 
 		MaxPool_2{ 2, 0, 2, MaxPool_2.M };
 	NeuralLayer 
 		FullConnect_1{ 32 * 7 * 7, 128 , sigmoid, sigmoidD}, 
-		FullConnect_2{ 128, 64 , sigmoid, sigmoidD },
-		FullConnect_3{  64, 10 , sigmoid, sigmoidD };
+		FullConnect_2{ 128, 64 ,         sigmoid, sigmoidD },
+		FullConnect_3{  64, 10 ,         sigmoid, sigmoidD };
 	Mat<>& (*lossFunc)(Mat<>& y, Mat<>& target, Mat<>& error) = QuadraticLossFuncD;
 	Tensor<> preIn;
 	LeNet() { ; }
@@ -664,20 +683,20 @@ public:
 		Tensor<>* y; preIn = in;
 		y = MaxPool_1(*Conv_1(in)); 
 		y = MaxPool_2(*Conv_2(*y));
-		y->function(sigmoid); static Mat<> y2; y2.rows = y->size(); y2.cols = 1; y2.data = y->data; 
+		static Mat<> y2; y2.rows = y->size(); y2.cols = 1; y2.data = y->data; 
 		return out = *FullConnect_3(*FullConnect_2(*FullConnect_1(y2)));
 	}
 	/*----------------[ backward ]----------------*/
-	void backward(Mat<>& target, double learnRate = 0.01) { 
-		static Mat<> error, tmp; tmp.rows = MaxPool_2.out.size(); tmp.cols = 1; tmp.data = MaxPool_2.out.data; 
+	void backward(Mat<>& target, double learnRate = -0.01) { 
+		static Mat<> error, tmp; tmp.getData_(MaxPool_2.out.size(), 1, MaxPool_2.out.data);
 		lossFunc(FullConnect_3.out, target, error);
 		FullConnect_3.backward(FullConnect_2.out, error, learnRate);
 		FullConnect_2.backward(FullConnect_1.out, error, learnRate);
-		FullConnect_1.backward(tmp, error, learnRate); 
+		FullConnect_1.backward(tmp              , error, learnRate);
 		static Tensor<> error2; error2.dim.alloc(3).getData(7, 7, 32); 
 		if (error2.data != NULL) delete error2.data; error2.data = error.data; error.data = NULL;
-		MaxPool_2.backward(Conv_2.out, error2);	Conv_2.backward(MaxPool_1.out, error2, learnRate);
-		MaxPool_1.backward(Conv_1.out, error2);	Conv_1.backward(preIn,         error2, learnRate); 
+		Conv_2.backward(MaxPool_1.out, MaxPool_2.backward(Conv_2.out, error2), learnRate);
+		Conv_1.backward(preIn,         MaxPool_1.backward(Conv_1.out, error2), learnRate);
 	}
 	/*----------------[ save/load ]----------------*/
 	void save(const char* saveFile) {
@@ -706,9 +725,10 @@ public:
 class GoogLeNet {
 public:
 	Inception a3, b3, a4, b4, c4, d4, e4, a5, b5;
-	ConvLayer preLayers;
+	BasicConv preLayers;
 	PoolLayer maxpool, avgpool;
 	NeuralLayer linear;
+	Tensor<> preIn;
 	GoogLeNet() {
 		preLayers.init(1, 64, 5, 1, 2);
 		a3.init( 64,  64,  96, 128, 16,  32,  32);
@@ -727,19 +747,15 @@ public:
 	/*----------------[ forward ]----------------*/
 	Mat<>& operator()(Tensor<>& in, Mat<>& out) { return forward(in, out); }
 	Mat<>& forward   (Tensor<>& in, Mat<>& out) {
-		Tensor<>* y;
-		y = preLayers(in);
-		y = b3(*a3 (*y));
-		y = maxpool(*y);
-		y = e4(*d4(*c4(*b4(*a4(*y)))));
-		y = maxpool(*y);
-		y = b5(*a5 (*y));
-		y = avgpool(*y);
-		Tensor<> t = *y;
-		Mat<> t2(t.dim.product()); t2.data = t.data; t.data = NULL;
-		Mat<>* maty = &t2;
-		maty = linear(*maty);
-		return out = *maty;
+		Tensor<>* y = preLayers(in); preIn = in;
+		y = maxpool(*b3(*a3(*y)));
+		y = maxpool(*e4(*d4(*c4(*b4(*a4(*y))))));
+		y = avgpool(*b5(*a5(*y)));
+		Mat<> t2(y->size()); memcpy(t2.data, y->data, y->size());
+		return out = *linear(t2);
+	}
+	/*----------------[ backward ]----------------*/
+	void backward(Mat<>& target, double learnRate = -0.01) {
 	}
 	/*----------------[ save/load ]----------------*/
 	void save(const char* saveFile) {
@@ -761,11 +777,11 @@ public:
 		fclose(file);
 	}
 };
-/*********************************************************************************
+/*************************************************************************************************
 						LSTM 长短期记忆网络
 *	正向传播:
 		xList, nodeList: 保持运行过程数据, 在反向传播中使用
-*********************************************************************************/
+*************************************************************************************************/
 class LstmNetwork
 {
 public:
@@ -773,7 +789,7 @@ public:
 	NeuralLayer nn;
 	Mat<> prevLstmS, prevLstmH;
 	std::vector<Mat<>> out;
-	double learnRate = 0.005;
+	double learnRate = -0.005;
 	LstmNetwork(int inSize, int LstmOutputSize, int outSize) {
 		lstm.init(inSize, LstmOutputSize);
 		nn.  init(LstmOutputSize, outSize, [](double x) { return x; }, [](double x) { return 1.0; });
