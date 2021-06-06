@@ -12,7 +12,6 @@ limitations under the License.
 ==============================================================================*/
 #ifndef NEURAL_NETWORKS_H
 #define NEURAL_NETWORKS_H
-#include <iostream>
 #include <vector>
 #include "../../LiGu_AlgorithmLib/Mat.h"
 #include "../../LiGu_AlgorithmLib/Tensor.h"
