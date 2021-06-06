@@ -150,6 +150,11 @@ public:
 		∂E / ∂k_l = ∂E / ∂y_l·∂y_l / ∂k_l = δ_l·∂y_l / ∂k_l
 		          = δ_l * x_l
 		∂E / ∂b_l = δ_l·∂y_l / ∂b_l = Σ_x Σ_y δ_l
+		其中:
+		∂y_lcij / ∂k_lcpq = x_{l,c,i+p-1,j+q-1}
+		∂y_lc   / ∂k_lcpq = Σ_(i=1)^Hy Σ_(j=1)^Wy x_{l,c,i+p-1,j+q-1}
+		∂E      / ∂k_lcpq = Σ_(i=1)^Hy Σ_(j=1)^Wy δ_lcij × x_{l,c,i+p-1,j+q-1}  = δ_lc * x_lc
+		∂E      / ∂b_lc   = Σ_(i=1)^Hy Σ_(j=1)^Wy δ_lcij = Σ_x Σ_y δ_l
 *************************************************************************************************/
 class ConvLayer {
 public:
