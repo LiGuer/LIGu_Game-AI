@@ -194,7 +194,7 @@ public:
 	/*----------------[ backward ]----------------*/
 	void backward(Tensor<>& preIn, Tensor<>& error, double learnRate) {
 		// σ'
-		error.function(actDerivFunc);
+		for (int i = 0; i < error.size(); i++) error[i] *= actDerivFunc(error[i]);
 		// δ_(l-1)
 		static Tensor<> delta; delta.eat(error);
 		error.alloc(preIn.dim).zero();
@@ -206,7 +206,7 @@ public:
 						zi =            error.i2z(i);
 					if (xi < 0 || xi >= delta.dim[0] || yi < 0 || yi >= delta.dim[1]) continue;
 					error(i) += delta(xi, yi, zo) * kernel(k + zi * kernel.size(2) + zo * kernel.size(3));
-				}
+				} 
 		// ∂E / ∂k_l
 		static Tensor<> deltaKernel; deltaKernel.alloc(kernel.dim).zero();
 		for (int i = 0; i < deltaKernel.size(); i++)
@@ -218,14 +218,14 @@ public:
 				if (xi < 0 || xi >= delta.dim[0] || yi < 0 || yi >= delta.dim[1]) continue;
 				deltaKernel(i) += delta(xi, yi, zo) * preIn(k + zi * preIn.size(2));
 			}
-		kernel += (deltaKernel *= learnRate); 
+		kernel += (deltaKernel *= learnRate);
 		// ∂E / ∂b_l
 		if (isBias) {
-			static Mat<> deltaBias;  deltaBias.alloc(bias.size());
+			static Mat<> deltaBias;  deltaBias.alloc(bias.size()).zero();
 			for (int i = 0; i < deltaBias.size(); i++) {
-				deltaBias[i] = 0;
 				for (int j = 0; j < delta.size(2); j++) deltaBias[i] += delta(j + i * delta.size(2));
-			} bias += (deltaBias *= learnRate); 
+			} 
+			bias += (deltaBias *= learnRate); 
 		}
 	}
 	/*----------------[ save / load ]----------------*/
@@ -658,8 +658,8 @@ public:
 class LeNet {
 public:
 	ConvLayer 
-		Conv_1{  1, 16, 5, 2, 1, relu, reluD },
-		Conv_2{ 16, 32, 5, 2, 1, relu, reluD };
+		Conv_1{  1, 16, 5, 2, 1, sigmoid, sigmoidD },
+		Conv_2{ 16, 32, 5, 2, 1, sigmoid, sigmoidD };
 	PoolLayer 
 		MaxPool_1{ 2, 0, 2, MaxPool_1.M }, 
 		MaxPool_2{ 2, 0, 2, MaxPool_2.M };
