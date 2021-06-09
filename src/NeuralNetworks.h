@@ -668,7 +668,7 @@ public:
 		MaxPool_1{ 2, 0, 2, MaxPool_1.M }, 
 		MaxPool_2{ 2, 0, 2, MaxPool_2.M };
 	NeuralLayer 
-		FullConnect_1{ 32 * 7 * 7, 128 , sigmoid, sigmoidD}, 
+		FullConnect_1{ 32 * 7 * 7, 128 , sigmoid, sigmoidD }, 
 		FullConnect_2{ 128, 64 ,         sigmoid, sigmoidD },
 		FullConnect_3{  64, 10 ,         sigmoid, sigmoidD };
 	Mat<>& (*lossFunc)(Mat<>& y, Mat<>& target, Mat<>& error) = QuadraticLossFuncD;
