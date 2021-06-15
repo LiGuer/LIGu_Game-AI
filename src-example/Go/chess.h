@@ -175,7 +175,7 @@ void boardInit(Mat<Piece>& board) {
 		-Pawn,-Pawn,-Pawn,-Pawn,-Pawn,-Pawn,-Pawn,-Pawn,
 		-Rook,-Knight,-Bishop,-Queen,-King,-Bishop,-Knight,-Rook,
 	};
-	board.getData(t);
+	board.get(t);
 }
 /*--------------------------------[ ≈–∂œ ‰”Æ ]--------------------------------*/
 char judgeWin(State& state) {

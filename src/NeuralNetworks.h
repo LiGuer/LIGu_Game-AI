@@ -685,12 +685,12 @@ public:
 	}
 	/*----------------[ backward ]----------------*/
 	void backward(Mat<>& target, double learnRate = -0.01) { 
-		static Mat<> error, tmp; tmp.getData_(MaxPool_2.out.size(), 1, MaxPool_2.out.data);
+		static Mat<> error, tmp; tmp.get_(MaxPool_2.out.size(), 1, MaxPool_2.out.data);
 		lossFunc(FullConnect_3.out, target, error);
 		FullConnect_3.backward(FullConnect_2.out, error, learnRate);
 		FullConnect_2.backward(FullConnect_1.out, error, learnRate);
 		FullConnect_1.backward(tmp              , error, learnRate);
-		static Tensor<> error2; error2.dim.alloc(3).getData(7, 7, 32); 
+		static Tensor<> error2; error2.dim.alloc(3).get(7, 7, 32); 
 		if (error2.data != NULL) delete error2.data; error2.data = error.data; error.data = NULL;
 		Conv_2.backward(MaxPool_1.out, MaxPool_2.backward(Conv_2.out, error2), learnRate);
 		Conv_1.backward(preIn,         MaxPool_1.backward(Conv_1.out, error2), learnRate);

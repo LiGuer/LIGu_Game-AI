@@ -15,8 +15,8 @@ limitations under the License.
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
-#include "MiniMax.h"
-#include "../../LiGu_AlgorithmLib/Mat.h"
+#include "../../src/MiniMax.h"
+#include "../../../LiGu_AlgorithmLib/Mat.h"
 /******************************************************************************
 *                    GoBang AI
 ******************************************************************************/
@@ -44,7 +44,7 @@ namespace GoBang_AI {
 	void run(CHESS* board, int& x, int& y, char who) {
 		State boardState;
 		Mat<CHESS> boardMat(15, 15);
-		boardState.board = &boardMat.getData(board);
+		boardState.board = &boardMat.get(board);
 		boardState.player = -who;
 		boardState.me	  =  who;
 		run(boardState, x, y);

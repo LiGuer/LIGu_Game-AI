@@ -15,8 +15,8 @@ limitations under the License.
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
-#include "../../LiGu_AlgorithmLib/Mat.h"
-#include "MontecarloTreeSearch.h"
+#include "../../../LiGu_AlgorithmLib/Mat.h"
+#include "../../src/MontecarloTreeSearch.h"
 /******************************************************************************
 *                    围棋AI Go-AI
 -------------------------------------------------------------------------------
@@ -77,7 +77,7 @@ int  judgeJie		(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, int pos, STONE 
 void run(STONE* board, int& x, int& y, STONE who, int& JiePos) {
 	State* root = new State;
 	root->player = -who;
-	root->board.getData(board);
+	root->board.get(board);
 	run(root, JiePos);
 	x = root->board.i2x(root->pos);
 	y = root->board.i2y(root->pos);
@@ -188,10 +188,9 @@ static bool downStone(State& state) {
 	//无气提子
 	for (int i = 0; i < state.board.size(); i++)
 		if (state.qi[state.mark[i]] == 0
-		&&  state.mark [i] != state.mark[state.pos]) {
-			state.board[i] = 0;
+		&&  state.mark [i] != state.mark[state.pos]) 
+			state.board[i] = 0,
 			state.mark [i] = 0;
-		}
 	//眼点禁入点劫点标记 (帮下一回标记)
 	judgeEyeAndNot(state.board, state.qi, state.mark, -state.player);
 	if (JiePos != -1)state.mark[JiePos] = JIEPOINT;
@@ -229,10 +228,10 @@ static void judgeEyeAndNot(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark, STON
 			if (judgeOut(xt, yt)) continue;
 			//核心判断
 			if (flagEye == 0x7FFFFFFF) flagEye = board(xt, yt);
-			if (board(xt, yt) != flagEye|| qi[mark(xt, yt)] == 1) { flagEye = 0; }	//同一色，且均非一气
-			if (board(xt, yt) == 0													//上下左右应不为空
-			|| (board(xt, yt) == player && qi[mark(xt, yt)] != 1)					//若是我，应只一气
-			|| (board(xt, yt) != player && qi[mark(xt, yt)] == 1)){ flagNot = 0; }	//若是敌，应必不只一气
+			if (board(xt, yt) != flagEye|| qi[mark(xt, yt)] == 1) flagEye = 0; 	//同一色，且均非一气
+			if (board(xt, yt) == 0												//上下左右应不为空
+			|| (board(xt, yt) == player && qi[mark(xt, yt)] != 1)				//若是我，应只一气
+			|| (board(xt, yt) != player && qi[mark(xt, yt)] == 1))flagNot = 0; 	//若是敌，应必不只一气
 		}
 		if (flagEye) mark[i] = EYEPOINT + (flagEye > 0 ? 1 : -1);
 		else 
@@ -286,10 +285,9 @@ static char judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
 	int ScoreBlack = 0,
 		ScoreWhite = 0;
 	for (int i = 0; i < state.board.size(); i++) {
-		if		(state.mark [i] == 0|| state.mark[i] == -40)	return 0;
+		if		(state.mark [i] == 0|| state.mark[i] == -40) return 0;
 		else if (state.board[i] == BLACK)				ScoreBlack++;
-		else if (state.board[i] 
-			== WHITE)				ScoreWhite++;
+		else if (state.board[i] == WHITE)				ScoreWhite++;
 		else if (state.mark [i] == EYEPOINT + BLACK)	ScoreBlack++;
 		else if (state.mark [i] == EYEPOINT + WHITE)	ScoreWhite++;
 	}
@@ -303,8 +301,7 @@ static char judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
 **--------------------------------------------------------------------------*/
 static void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark) {
 	//棋块标记
-	int markCur = 1;
-	int HeadStoneFlag[BOARDSIZE * BOARDSIZE] = { 0 };			//并查集头节点标记
+	int markCur = 1, HeadStoneFlag[BOARDSIZE * BOARDSIZE] = { 0 };			//并查集头节点标记
 	for (int y = 0; y < BOARDSIZE; y++) {
 		for (int x = 0; x < BOARDSIZE; x++) {
 			if (board(x, y) == 0) continue;
@@ -319,12 +316,11 @@ static void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark) {
 				flag = 0;
 				if (mark(x, y) == 0)
 					mark(x, y) =  mark(x - 1, y);
-				else if (
-					mark(x, y) != mark(x - 1, y)
-				) {
+				else 
+				if (mark(x, y) != mark(x - 1, y)) {
 					//并查集 更新
-					int    HeadStoneMe   =  HeadStoneFlag[mark(x, y)],
-						   HeadStoneLeft =  HeadStoneFlag[mark(x - 1, y)];
+					int    HeadStoneMe   =  HeadStoneFlag[mark(x,    y)],
+						   HeadStoneLeft =  HeadStoneFlag[mark(x - 1,y)];
 					while (HeadStoneMe   != HeadStoneFlag[HeadStoneMe  ])
 						   HeadStoneMe   =  HeadStoneFlag[HeadStoneMe  ];	//检索头节点
 					while (HeadStoneLeft != HeadStoneFlag[HeadStoneLeft])
@@ -334,10 +330,7 @@ static void ComputerQi(Mat<STONE>& board, Mat<int>& qi, Mat<int>& mark) {
 				}
 			}
 			//No STONE like
-			if (flag) {
-				HeadStoneFlag[markCur] = markCur;
-				mark(x, y) = markCur++;
-			}
+			if (flag) mark(x, y) = HeadStoneFlag[markCur] = markCur++;
 		}
 	}
 	//完成棋块标记
