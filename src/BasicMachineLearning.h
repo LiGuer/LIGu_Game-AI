@@ -44,9 +44,9 @@ namespace BasicMachineLearning {
 		协方差矩阵对角化
 		=>	min_W	tr( W^T x x^T W )
 			st.		W^T W = I
-		Lagrange函数 L(,λ) = W^T x x^T W + λ( W^T W - I )
-		Lagrange对偶 G(λ) = inf L(,λ) = inf (W^T x x^T W + λ( W^T W - I ))
-		L(,λ)求导, 当导数为0时, 取得极值
+		Lagrange函数 L(W,λ) = W^T x x^T W + λ( W^T W - I )
+		Lagrange对偶 G(λ) = inf L(W,λ) = inf (W^T x x^T W + λ( W^T W - I ))
+		L(W,λ)求导, 当导数为0时, 取得极值
 		=>	X X^T ω_i = λ_i ω_i,
 		即.对协方差X XT, 特征值求解
 		取特征值最大的yDim个特征向量, 即目标投影矩阵W
@@ -182,36 +182,81 @@ void CubicSpline(double x, double y) {
 		w_i(x) = (1/d_i(x)^α) / (Σ 1/d_i(x)^α)
 		d_i(x) = ||x - x_i||₂
 *********************************************************************************/
-Mat<>& InvDisWeight(Mat<>& data, double xs, double xe, double ys, double ye, double dx, double dy, Mat<>& z, int alpha = 2) {
-	int xn = (xe - xs) / dx + 1,
-		yn = (ye - ys) / dy + 1;
-	z.zero(xn, yn);
-	for (int r = 0; r < xn; r++) {
-		for (int c = 0; c < yn; c++) {
-			double x = xs + r * dx, y = ys + c * dy;
-			double d0 = 0;
-			for (int i = 0; i < data.cols; i++) {
-				d0 += pow((pow(x - data(0, i), 2) + pow(y - data(1, i), 2)), -alpha);
-			}
-			for (int i = 0; i < data.cols; i++) {
-				double d = pow((pow(x - data(0, i), 2) + pow(y - data(1, i), 2)), -alpha);
-				z(r, c) += (d / d0) * data(2, i);
-			}
-		}
+double InvDisWeight(Mat<>& data, double x, double y, int alpha = 2) {
+	double z = 0, d0 = 0;
+	for (int i = 0; i < data.cols; i++) {
+		d0 += pow((pow(x - data(0, i), 2) + pow(y - data(1, i), 2)), -alpha);
+	}
+	for (int i = 0; i < data.cols; i++) {
+		double d = pow((pow(x - data(0, i), 2) + pow(y - data(1, i), 2)), -alpha);
+		z += (d / d0) * data(2, i);
 	}
 	return z;
 }
 /*********************************************************************************
-[Kriging插值]:
+[普通Kriging插值]: Ordinary Kriging
 	[目的]:
-		空间插值
+		空间插值. 满足假设:
+		(1) 空间属性z是均一的. 对空间任意一点，都有相同期望、方差.
+	[步骤]:
+		(1) 确定半方差函数γ(xi,xj) = E[(Z(x_i) - Z(x_j))²]
+			确定半方差函数与两点间距离的函数关系.
+		(2) 计算权值
+			权值计算方程:
+			[w_1]		[ γ(x1,x1)	...	γ(x1,xn)	 1	]^-1	[γ(x1,x*)]
+			|...|  =	|	...		...		...		...	|		|	...	  |
+			|w_n|		| γ(xn,x1)	...	γ(xn,xn)	 1	|		|γ(x1,x*)|
+			[μ ]		[	 1		...		 1		 0	]		[	 1	  ]
+		(3) 计算插值点结果
+			f(x) = Σ w_i(x) f(x_i)
 	[原理]:
-		f(x) = Σ w_i(x) f(x_i)
-		权重系数是能够满足点(xo,yo)处估计值与真实值之差最小的一套最优系数
-
+		(1) f(x) = Σ w_i(x) f(x_i)
+			z~: 估计值	z : 实际值
+			求解权重系数: 使其为满足插值点处，估计值与真实值差最小的一组系数.
+		(2) 对空间任意一点，都有相同期望、方差. 即:
+			E	(z(x,y)) = μ
+			Var	(z(x,y)) = σ²
+			即. z(x,y) = μ + R(x,y)    Var(R(x,y)) = σ²
+		(3) 约束方程 —— 无偏估计条件 E(z~ - z) = 0
+			=> E(z~ - z) = E(Σ w_i z_i - μ) = μΣ w_i - μ = 0
+			=> Σ w_i = 1
+		(4)	目标函数 —— 估计误差 var = Var(z~ - z)
+			=> var = Var(Σ w_i z_i - z) = ΣΣ w_i w_j Cov(zi,zj) - 2Σ w_i Cov(zi,z) + cov(z,z)
+			=> var = ΣΣ w_i w_j C_ij - 2Σ w_i C_i0 + cov_00		(C_ij = Cov(zi - μ,z - μ))
+		(5) 定义 半方差函数γ_ij = σ² - C_ij
+			=> var = 2Σ w_i γ_i0 - ΣΣ w_i w_j γ_ij - γ_00
+		(6) 凸优化问题构建完成:
+				min		var = 2Σ w_i γ_i0 - ΣΣ w_i w_j γ_ij - γ_00
+				s.t.	Σ w_i = 1
+			Lagrange函数	L(w_i, λ) = var + λ(Σ w_i - 1)
+			Lagrange对偶	G(λ) = inf L(w_i, λ)
+			L(W,λ)求导, 当导数为0时, 取得极值
+			即. 得到权值计算方程.
+		(7) 半方差函数γ_ij = σ² - C_ij = E[(Z(x_i) - Z(x_j))²]
+			∵地理学第一定律: 空间上相近的属性相近.
+			∴γ_ij与两点间距离，存在函数关系
+			将所有d和γ绘成散点图，寻找最优曲线拟合d与γ，得到函数关系式.
 *********************************************************************************/
-void Kriging() {
-
+double KrigingOrdinary(Mat<>& data, double x, double y, double(*variogram)(double x1, double y1, double x2, double y2)) {
+	double z = 0;
+	int N = data.cols;
+	Mat<> weight(N + 1), R0(N + 1, N + 1), R(N + 1);
+	//R0 R
+	R0 = 1; R0(N, N) = 0;
+	R(N) = 1;
+	for (int i = 0; i < N; i++) {
+		R(i) = variogram(data(0, i), data(1, i), x, y);
+		for (int j = 0; j < N; j++) {
+			R0(i, j) = variogram(data(0, i), data(1, i), data(0, j), data(0, j));
+		}
+	}
+	//lambda z
+	weight.mul(R0.inv(R0), R);
+	for (int i = 0; i < data.cols; i++) {
+		z += weight[i] * data(2, i);
+	}
+	z += weight[N];
+	return z;
 }
 
 
