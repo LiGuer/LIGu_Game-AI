@@ -30,6 +30,9 @@ namespace BasicMachineLearning {
 		数据降维，提取数据的主要特征分量, 满足：
 		(1) 最近重构性: 样本点到该超平面的距离都足够近。
 		(2) 最大可分性: 样本点在该超平面的投影尽可能分开。
+	[优化问题]:
+		min_W		tr( W^T x x^T W )
+		s.t.		W^T W = I
 	[流程]: 
 		(1) 数据中心化, Σ \vec x_i = 0
 		(2) 计算协方差矩阵 C = X X^T
@@ -42,8 +45,8 @@ namespace BasicMachineLearning {
 		协方差矩阵:
 			D = 1/m Y Y^T = 1/m (PX) (PX)^T = 1/m P X X^T P^T = 1/m P C P^T
 		协方差矩阵对角化
-		=>	min_W	tr( W^T x x^T W )
-			st.		W^T W = I
+		=>	min_W		tr( W^T x x^T W )
+			s.t.		W^T W = I
 		Lagrange函数 L(W,λ) = W^T x x^T W + λ( W^T W - I )
 		Lagrange对偶 G(λ) = inf L(W,λ) = inf (W^T x x^T W + λ( W^T W - I ))
 		L(W,λ)求导, 当导数为0时, 取得极值
@@ -141,6 +144,59 @@ void K_Mean(Mat<>& x, int K, Mat<>& Center, std::vector<int>* Cluster, int TimeM
 	}
 }
 
+
+
+
+/*################################################################################
+
+						回归
+	[目标]:
+		* 分类，是离散的回归问题.
+#################################################################################*/
+/******************************************************************************
+[最小二乘法]
+	[目标]:
+		求一条直线，使得所有样本点到该直线的Euclid距离最小.
+	[优化问题]:
+		min_w	MSE(y~)*n = Σ (y~ - y)² = Σ (w^T x - y)²
+	[原理]:
+		(1) 直线方程: f(x) = w^T x + b = w^T x'		(x' = [1, x], w_0 = b)
+		(2) 均方误差: 
+				MSE(y~)*n = Σ (y~ - y)² 
+				= Σ (w^T x - y)² = (X w - y)^T (X w - y)
+		(3) 优化问题构造: 无约束凸优化问题
+				min_W	Σ (w^T x - y)² = (X w - y)^T (X w - y)
+		(4) 计算最优点: 求导, 导数为0时取得极值
+				∂MSE / ∂W = 2·X^T·(w^T x - y) = 0
+			=>	w* = (X^T X)^-1 X^T y
+				f(x) = x^T (X^T X)^-1 X^T y
+		(5) 一维场景:
+			优化问题:
+				min_{w,b}	Σ (w^T x_i + b - y_i)²
+			=>	∂E/∂w = 2( w^T Σx_i² + Σ(x_i(b - y_i)) )	= 0
+				∂E/∂b = 2( n b + Σ(y_i - w x_i) )			= 0
+			最优点:
+			=>	wΣx_i² = Σ_i x_i y_i - 1/n (Σ_i x_i)(Σ_i y_i) + w/n (Σ_i x_i)²
+				w* = (Σ y_i(x_i - x¯)) / (Σ x_i² - 1/n (Σ x_i)²)
+				b* = 1/n·Σ(y_i - w x_i)
+******************************************************************************/
+void OrdinaryLeastSquares(Mat<>& x, Mat<>& y, double& w, double& b) {
+	//w 
+	double w1 = 0, w2 = 0, xbar = x.mean();
+	for (int i = 0; i < x.size(); i++) {
+		w1 += y[i] * (x[i] - xbar);
+		w2 += x[i] * x[i];
+	}
+	w = w1 / (w2 - pow(x.sum(), 2) / x.size());
+	//b 
+	b = 0;
+	for (int i = 0; i < x.size(); i++) {
+		b += y[i] - w * x[i];
+	}
+	b /= x.size();
+}
+
+
 /*################################################################################
 
 						插值
@@ -198,6 +254,10 @@ double InvDisWeight(Mat<>& data, double x, double y, int alpha = 2) {
 	[目的]:
 		空间插值. 满足假设:
 		(1) 空间属性z是均一的. 对空间任意一点，都有相同期望、方差.
+	[优化问题]:
+		min		var = 2Σ w_i γ_i0 - ΣΣ w_i w_j γ_ij - γ_00
+		s.t.	Σ w_i = 1
+				γ_ij = σ² - C_ij = E[(Z(x_i) - Z(x_j))²]
 	[步骤]:
 		(1) 确定半方差函数γ(xi,xj) = E[(Z(x_i) - Z(x_j))²]
 			确定半方差函数与两点间距离的函数关系.
@@ -218,7 +278,7 @@ double InvDisWeight(Mat<>& data, double x, double y, int alpha = 2) {
 			Var	(z(x,y)) = σ²
 			即. z(x,y) = μ + R(x,y)    Var(R(x,y)) = σ²
 		(3) 约束方程 —— 无偏估计条件 E(z~ - z) = 0
-			=> E(z~ - z) = E(Σ w_i z_i - μ) = μΣ w_i - μ = 0
+			=> E(z~ - z) = E(Σ w_i z_i - z) = μΣ w_i - μ = 0
 			=> Σ w_i = 1
 		(4)	目标函数 —— 估计误差 var = Var(z~ - z)
 			=> var = Var(Σ w_i z_i - z) = ΣΣ w_i w_j Cov(zi,zj) - 2Σ w_i Cov(zi,z) + cov(z,z)
