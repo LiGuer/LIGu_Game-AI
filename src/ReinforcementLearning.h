@@ -123,7 +123,8 @@ public:
 			min		||w||² / 2
 			s.t.	y_i (w^T x_i + b) ≥ 1
 	[步骤]:
-
+		(1) 计算λ
+		(2) 计算w,b
 	[原理]:
 		(1) 超平面方程: w^T x + b = 0
 			点面距: d = |w^T x + b| / ||w||
@@ -139,7 +140,7 @@ public:
 				s.t.	y_i (w^T x_i + b) ≥ 1
 		(5) 计算最优点: 
 			Lagrange函数	
-				L(w, b, λ) = ||w||² / 2 + Σλ_i (1 - y_i (w^T x_i + b))
+				L(w, b,λ) = ||w||² / 2 + Σλ_i (1 - y_i (w^T x_i + b))
 				L(w, b,λ)求导, 当导数为0时, 取得极值
 				=>	w* = Σ λ_i y_i x_i		0 = Σ λ_i y_i
 			Lagrange对偶	
@@ -158,7 +159,72 @@ public:
 			=>	设 核函数к(x_i, x_j) = Φ(x_i)^T Φ(x_j)
 				f(x) = w*^T x + b = Σ λ_i y_i к(x, x_i) + b
 			*	к是核函数 <=> 核矩阵[a_ij = к(x_i, x_j)]总是半正定
+		(7) Sequential Minimal Optimization算法
+			∵	λ是n-1自由度, 确定前n-1个量, 则第n个由Σ λ_i y_i = 0自动确定.
+			∴	每次选2个λ_i λ_j, 固定其他λ_k不变, 优化λ_i λ_j, 更新b
+			优化λ_i λ_j:
+			=>	λ_i = (-Σ_{k≠i≠j} λ_k y_k)·y_1 - λ_j y_i y_j = ζ y_1 - λ_j y_i y_j
+				G(λ_j) = (λ_j + ζ y_1 - λ_j y_i y_j) + C - v_i (ζ-λ_j y_j) - v_j λ_j y_j 
+						- 1/2 к_ii (ζ-λ_j y_j)² - 1/2 к_jj λ_j² - к_ij λ_j y_j (ζ-λ_j y_j)²
+				其中 v_i = Σ_{k≠i≠j} λ_i y_i к_ki = f(x_i) - λ_i y_i к_ii -λ_j y_j к_ij - b, v_j同理
+				∂G/∂λ_j = (к_ii+к_jj+к_ij)(λ_j^old - λ_j^new) + y_j(y_j-y_i+f(x_i)-f(x_j)) = 0
+			=>	λ_j^new = λ_j^old + y_j (E_i - E_j)/(к_ii+к_jj+к_ij)		其中E_i = f(x_i) - y_i
+			修剪: 使得λ_j* 满足约束条件, λ_j应当∈[L,H]:
+				y_i≠y_j时,	下界L = max(0,λ_j^old-λ_i^old)	,上界L = min(C,λ_j^old-λ_i^old + C)
+				y_i= y_j时,	下界L = max(0,λ_j^old+λ_i^old - C),上界L = min(C,λ_j^old+λ_i^old)
+			更新b:
 ******************************************************************************/
-void SupportVectorMachines(Mat<>& X, Mat<int>& Y) {
-
+// select alpha j which has the biggest step
+void selectLambda_j() { 
+	; 
+	return j;
+}
+void SupportVectorMachines_SMO(Mat<>& X, Mat<int>& Y，int i) {
+	double err_i = calcError(i);
+	if( (Y[i] * err_i < -toler && lamb[i] < C)
+	||	(Y[i] * err_i >  toler && lamb[i] > 0)
+	) {
+		//1. select λ_j
+		selectLambda_j(j, err_j);
+		double lamb_i_old = lamb[i];
+		double lamb_j_old = lamb[j];
+		//2. L,H
+		double L = Y[i] != Y[j] ? std::max(0, lamb[j] - lamb[i])    : std::max(0, lamb[j] + lamb[i] - C);
+			   H = Y[i] != Y[j] ? std::min(C, lamb[j] - lamb[i] + C): std::min(C, lamb[j] + lamb[i]);
+		if (L == H) return 0;
+		//3: calculate eta (the similarity of sample i and j)
+		double eta = 2 * kernelMat(i, j) - kernelMat(i, i) - kernelMat(i, j);
+		if (eta >= 0) return 0;
+		//4. update & clip λ_j, update λ_i
+		lamb[j] -= Y[j] * (err_i - err_j) / eta;
+		lamb[j] = lamb[j] < H ? lamb[j] : H;
+		lamb[j] = lamb[j] > L ? lamb[j] : L;
+		lamb[i] += Y[i] * Y[j] * (lamb_j_old - lamb[j]);
+		//5. if alpha j not moving enough, just return		
+		if (abs(lamb_j_old - lamb[j]) < 1e-5) {
+			updateError(j); return 0;
+		}
+		//6. update b
+		double b1 = Y[i] * (lamb[i] - lamb_i_old) * kernelMat(i, i)
+				  - Y[j] * (lamb[j] - lamb_j_old) * kernelMat(i, j);
+		double b2 = Y[i] * (lamb[i] - lamb_i_old) * kernelMat(i, j)
+				  - Y[j] * (lamb[j] - lamb_j_old) * kernelMat(j, j);
+		b = (lamb[i] > 0 && lamb[i] < C) ? b1 : ((lamb[j] > 0 && lamb[j] < C) ? b2 : (b1 + b2) / 2);
+		updateError(i);
+		updateError(j);
+		return 1;
+	} return 0;
+}
+void SupportVectorMachines(Mat<>& X, Mat<int>& Y，int maxIter = 100) {
+	int N = X.cols;
+	Mat<> lamb(X);
+	// Iteration termination condition :
+		//Condition 1: reach max iteration
+		//Condition 2: no alpha changed after going through all samples, all alpha(samples) fit KKT condition
+	for (int iter = 0; iter < maxIter; iter++) {
+		double lambPairsChanged = 0;
+		for (int i = 0; i < N; i++) {
+			lambPairsChanged = SupportVectorMachines_SMO(i);
+		}
+	}
 };
