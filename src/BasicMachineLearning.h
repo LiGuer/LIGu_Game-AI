@@ -37,22 +37,25 @@ namespace BasicMachineLearning {
 		(1) 数据中心化, Σ \vec x_i = 0
 		(2) 计算协方差矩阵 C = X X^T
 		(3) 对协方差矩阵C 特征值分解
-		(4) 取最大的d'个特征值所对应的特征向量{w1,w2,...,wd'},投影矩阵 W = (w1,w2,...,wd')
+		(4) 取最大d'个特征值所对应的特征向量{w1,w2,...,wd'},投影矩阵 W = (w1,w2,...,wd')
 		(5) 样本点在超平面投影: y_i = W^T x_i
 	[原理]:
-		分别从目标(1, 2)可以推得同样的结果。
-		样本点到超空间投影: y = WT x, 尽可能分开即.方差最大:max Σ WT x xT W
-		协方差矩阵:
-			D = 1/m Y Y^T = 1/m (PX) (PX)^T = 1/m P X X^T P^T = 1/m P C P^T
-		协方差矩阵对角化
-		=>	min_W		tr( W^T x x^T W )
-			s.t.		W^T W = I
-		Lagrange函数 L(W,λ) = W^T x x^T W + λ( W^T W - I )
-		Lagrange对偶 G(λ) = inf L(W,λ) = inf (W^T x x^T W + λ( W^T W - I ))
-		L(W,λ)求导, 当导数为0时, 取得极值
-		=>	X X^T ω_i = λ_i ω_i,
-		即.对协方差X XT, 特征值求解
-		取特征值最大的yDim个特征向量, 即目标投影矩阵W
+			分别从目标(1, 2)可以推得同样的结果
+		(3)	目标函数: 样本点到超空间投影 y = WT x 尽可能分开
+			即.方差最大:max Σ WT x xT W
+			协方差矩阵:
+				D = 1/m Y Y^T = 1/m (PX) (PX)^T = 1/m P X X^T P^T = 1/m P C P^T
+			协方差矩阵对角化
+		(4) 优化问题构造:
+				min_W		tr( W^T x x^T W )
+				s.t.		W^T W = I
+		(5) 计算最优点:
+			Lagrange函数 L(W,λ) = W^T x x^T W + λ( W^T W - I )
+			Lagrange对偶 G(λ) = inf L(W,λ) = inf (W^T x x^T W + λ( W^T W - I ))
+			L(W,λ)求导, 当导数为0时, 取得极值
+			=>	X X^T ω_i = λ_i ω_i,
+			即.对协方差X XT, 特征值求解
+		()	取特征值最大的yDim个特征向量, 即目标投影矩阵W
 *******************************************************************************/
 void PCA(Mat<>& x, Mat<>& y, int yDim) {
 	//[1]
@@ -307,7 +310,7 @@ double KrigingOrdinary(Mat<>& data, double x, double y, double(*variogram)(doubl
 	for (int i = 0; i < N; i++) {
 		R(i) = variogram(data(0, i), data(1, i), x, y);
 		for (int j = 0; j < N; j++) {
-			R0(i, j) = variogram(data(0, i), data(1, i), data(0, j), data(0, j));
+			R0(i, j) = variogram(data(0, i), data(1, i), data(0, j), data(1, j));
 		}
 	}
 	//lambda z
