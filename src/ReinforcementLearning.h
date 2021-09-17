@@ -173,64 +173,45 @@ public:
 			更新b:
 		(8)	软间隔:
 ******************************************************************************/
-double calcError(int index, Mat<>& X, int* y, Mat<>& lamb, double b, Mat<>& kernelMat) {
-	double y_ = 0; Mat<> tmp;
-	for (int i = 0; i < lamb.size(); i++) {
-		y_ += lamb[i] * y[i] * kernelMat(index, i);
-	}
-	return y_ - y[index];
-}
-int selectLambda_j(int i, double err_i, double& err_j, Mat<>& X, int* y, Mat<>& lamb, Mat<>& kernelMat, double b) {
-	int j;
-	double maxErr = 0;	err_j = 0;
-	int candidateAlphaList[100], candidateAlphaList_N = 0;
-	for (int k = 0; k < candidateAlphaList_N; k++) {
-		if (k == i) continue;
-		double err_k = calcError(k, X, y, lamb, b, kernelMat);
-		if (abs(err_k - err_i) > maxErr) {
-			maxErr = abs(err_k - err_i); j = k; err_j = err_k;
+bool SupportVectorMachines_SMO(Mat<>& X, int* y, int i, double& b, Mat<>& lamb, double C, double toler, Mat<>& kernelMat) {
+	// error[]
+	static Mat<> err(X.cols);
+	for (int k = 0; k < err.size(); k++) {
+		err[k] = b - y[k];
+		for (int h = 0; h < lamb.size(); h++) {
+			err[k] += lamb[h] * y[h] * kernelMat(k, h);
 		}
 	}
-	if (candidateAlphaList_N == 0) {
-		j = i;
-		while (j == i) {
-			j = rand() % X.cols;
-			err_j = calcError(j, X, y, lamb, b, kernelMat);
-		}	
-	}
-	return j;
-}
-bool SupportVectorMachines_SMO(Mat<>& X, int* y, int i, double& b, Mat<>& lamb, double C, double toler, Mat<>& kernelMat, Mat<>& error) {
-	double err_i = calcError(i, X, y, lamb, b, kernelMat);
-	if( (y[i] * err_i < -toler && lamb[i] < C)
-	||	(y[i] * err_i >  toler && lamb[i] > 0)
+	// λ_j, λ_i
+	if( (y[i] * err[i] < -toler && lamb[i] < C)
+	||	(y[i] * err[i] >  toler && lamb[i] > 0)
 	) {
-		//1.select λ_i, λ_j,  calcu err_i, err_ j
-		double err_j;
-		int j = selectLambda_j(i, err_i, err_j, X, y, lamb, kernelMat, b);
+		//1.j, err_i, err_ j
+		int j = -1;
+		double maxErr = 0;
+		for (int k = 0; k < err.size(); k++) {
+			if (k == i) continue;
+			maxErr = maxErr > abs(err[k] - err[i]) ? maxErr : (j = k, abs(err[k] - err[i]));
+		}
+		if (j == -1) { while ((j = rand() % X.cols) == i); }
 		double lamb_i_old = lamb[i],
 			   lamb_j_old = lamb[j];
-		//3. к_ii+к_jj-2к_ij, L, H
+		//2.к_ii+к_jj-2к_ij, L, H
 		double K = 2 * kernelMat(i, j) - kernelMat(i, i) - kernelMat(j, j),
 			   L = y[i] != y[j] ? std::max(0.0,lamb[j] - lamb[i])    : std::max(0.0,lamb[j] + lamb[i] - C),
 			   H = y[i] != y[j] ? std::min(C,  lamb[j] - lamb[i] + C): std::min(C,  lamb[j] + lamb[i]);
 		if (K >= 0 || L == H) return 0;
-		//4. update & clip λ_j, update λ_i
-		lamb[j] -= y[j] * (err_i - err_j) / K;
+		//3.λ_j, λ_i
+		lamb[j] -= y[j] * (err[i] - err[j]) / K;
 		lamb[j] = lamb[j] < H ? (lamb[j] > L ? lamb[j] : L) : H;
 		lamb[i] += y[i] * y[j] * (lamb_j_old - lamb[j]);
-		//5. if alpha j not moving enough, just return
-		if (abs(lamb_j_old - lamb[j]) < 1e-5) {
-			error[j] = err_j; return 0;
-		}
-		//6. update b
-		double b1 = y[i] * (lamb[i] - lamb_i_old) * kernelMat(i, i)
-				  - y[j] * (lamb[j] - lamb_j_old) * kernelMat(i, j);
-		double b2 = y[i] * (lamb[i] - lamb_i_old) * kernelMat(i, j)
-				  - y[j] * (lamb[j] - lamb_j_old) * kernelMat(j, j);
-		b = (lamb[i] > 0 && lamb[i] < C) ? b1 : ((lamb[j] > 0 && lamb[j] < C) ? b2 : (b1 + b2) / 2);
-		error[i] = err_i;
-		error[i] = err_i;
+		if (abs(lamb_j_old - lamb[j]) < 1e-5) return 0;
+		//4.b
+		double bi = - y[i] * (lamb[i] - lamb_i_old) * kernelMat(i, i)
+				    - y[j] * (lamb[j] - lamb_j_old) * kernelMat(i, j) - err[i] + b,
+			   bj = - y[i] * (lamb[i] - lamb_i_old) * kernelMat(i, j)
+					- y[j] * (lamb[j] - lamb_j_old) * kernelMat(j, j) - err[j] + b;
+		b = (lamb[i] > 0 && lamb[i] < C) ? bi : ((lamb[j] > 0 && lamb[j] < C) ? bj : (bi + bj) / 2);
 		return 1;
 	} return 0;
 }
@@ -238,18 +219,18 @@ double SupportVectorMachines(Mat<>& X, int* y, Mat<>& w, double C, double toler,
 	int N = X.cols;
 	double b;
 	// kernel matrix
-	Mat<> kernelMat(N, N), error(N), tmp1, tmp2;
+	Mat<> kernelMat(N, N), tmp1, tmp2; 
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N; j++) {
-			kernelMat(i, j) = kernel(X.getRow(i, tmp1), X.getRow(j, tmp2));
+			kernelMat(i, j) = kernel(X.getCol(i, tmp1), X.getCol(j, tmp2));
 		}
 	}
 	// λ*
-	Mat<> tmp, lamb(X);
+	Mat<> lamb(X.rows);
 	for (int iter = 0; iter < maxIter; iter++) {
 		bool lambPairsChanged = 0;
 		for (int i = 0; i < N; i++) {
-			lambPairsChanged = SupportVectorMachines_SMO(X, y, i, b, lamb, C, toler, kernelMat, error);
+			lambPairsChanged = ~SupportVectorMachines_SMO(X, y, i, b, lamb, C, toler, kernelMat);
 		}
 		if (lambPairsChanged) break;
 	}
@@ -260,5 +241,9 @@ double SupportVectorMachines(Mat<>& X, int* y, Mat<>& w, double C, double toler,
 			w[dim] += X(dim, i) * lamb[dim] * y[dim];
 		}
 	}
+
+	for (int i = 0; i < w.size(); i++)
+		printf("%f ", w[i]);
+	printf("\n%f \n", b);
 	return b;
 };
