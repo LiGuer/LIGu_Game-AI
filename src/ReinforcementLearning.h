@@ -15,25 +15,23 @@ limitations under the License.
 #include <algorithm>
 #include <vector>
 /******************************************************************************
-*								QLearning
-*	[定义]:Q(s,a) = (1 + lr)·Q(s,a) + lr·( R + g·max Q(s',:) )
+[QLearning]
+	[定义]:Q(s,a) = (1 + lr)·Q(s,a) + lr·( R + g·max Q(s',:) )
 			s: state	a: action	R: reward	lr: learning rate	g: forget factor
-*	[原理]:
+	[原理]:
 		选择动作: ε-greedy方法:
 			每个状态以ε概率随机选取动作，1-ε概率选择当前最优解
 		眼前利益R: 反馈值.
 		记忆中的利益 max Q(s',:): 记忆里，新位置s'能给出的最大效用值.
 		forget factor越大，越重视以往经验，越小，则只重视眼前利益R.
-*	[流程]:
+	[步骤]:
 		[1] Init Q table arbitrarily
 		[2] Repeat (for each episode), until s is terminal
 			[3] Choose a from s using policy derived from Q (eg. ε-greedy)
 			[4] Take action a, observe r s'
 			[5] Q(s,a) = (1 + lr)·Q(s,a) + lr·( R + g·max Q(s',:) )
 				s = s'
-*	[Ps]:
-		可以逐渐降低随机选取动作的概率ε，一开始随机率可达100%
-			然后随训练次数的深入，应当逐渐降低随机概率。
+	[注]: 可以逐渐降低随机选取动作的概率ε,一开始随机率可达100%,然后随训练次数增加,应逐渐降低随机概率.
 *******************************************************************************/
 class QLearning {
 public:
@@ -123,8 +121,8 @@ public:
 			min		||w||² / 2
 			s.t.	y_i (w^T x_i + b) ≥ 1
 	[步骤]:
-		(1) 计算λ
-		(2) 计算w,b
+		(1) 计算λ*
+		(2) 计算 w*, b*
 	[原理]:
 		(1) 超平面方程: w^T x + b = 0
 			点面距: d = |w^T x + b| / ||w||
@@ -167,64 +165,100 @@ public:
 				G(λ_j) = (λ_j + ζ y_1 - λ_j y_i y_j) + C - v_i (ζ-λ_j y_j) - v_j λ_j y_j 
 						- 1/2 к_ii (ζ-λ_j y_j)² - 1/2 к_jj λ_j² - к_ij λ_j y_j (ζ-λ_j y_j)²
 				其中 v_i = Σ_{k≠i≠j} λ_i y_i к_ki = f(x_i) - λ_i y_i к_ii -λ_j y_j к_ij - b, v_j同理
-				∂G/∂λ_j = (к_ii+к_jj+к_ij)(λ_j^old - λ_j^new) + y_j(y_j-y_i+f(x_i)-f(x_j)) = 0
-			=>	λ_j^new = λ_j^old + y_j (E_i - E_j)/(к_ii+к_jj+к_ij)		其中E_i = f(x_i) - y_i
+				∂G/∂λ_j = -(к_ii+к_jj-2к_ij)(λ_j^old - λ_j^new) + y_j(y_j-y_i+f(x_i)-f(x_j)) = 0
+			=>	λ_j^new = λ_j^old + y_j (E_i - E_j)/(к_ii+к_jj-2к_ij)		其中E_i = f(x_i) - y_i
 			修剪: 使得λ_j* 满足约束条件, λ_j应当∈[L,H]:
 				y_i≠y_j时,	下界L = max(0,λ_j^old-λ_i^old)	,上界L = min(C,λ_j^old-λ_i^old + C)
 				y_i= y_j时,	下界L = max(0,λ_j^old+λ_i^old - C),上界L = min(C,λ_j^old+λ_i^old)
 			更新b:
+		(8)	软间隔:
 ******************************************************************************/
-// select alpha j which has the biggest step
-void selectLambda_j() { 
-	; 
+double calcError(int index, Mat<>& X, int* y, Mat<>& lamb, double b, Mat<>& kernelMat) {
+	double y_ = 0; Mat<> tmp;
+	for (int i = 0; i < lamb.size(); i++) {
+		y_ += lamb[i] * y[i] * kernelMat(index, i);
+	}
+	return y_ - y[index];
+}
+int selectLambda_j(int i, double err_i, double& err_j, Mat<>& X, int* y, Mat<>& lamb, Mat<>& kernelMat, double b) {
+	int j;
+	double maxErr = 0;	err_j = 0;
+	int candidateAlphaList[100], candidateAlphaList_N = 0;
+	for (int k = 0; k < candidateAlphaList_N; k++) {
+		if (k == i) continue;
+		double err_k = calcError(k, X, y, lamb, b, kernelMat);
+		if (abs(err_k - err_i) > maxErr) {
+			maxErr = abs(err_k - err_i); j = k; err_j = err_k;
+		}
+	}
+	if (candidateAlphaList_N == 0) {
+		j = i;
+		while (j == i) {
+			j = rand() % X.cols;
+			err_j = calcError(j, X, y, lamb, b, kernelMat);
+		}	
+	}
 	return j;
 }
-void SupportVectorMachines_SMO(Mat<>& X, Mat<int>& Y，int i) {
-	double err_i = calcError(i);
-	if( (Y[i] * err_i < -toler && lamb[i] < C)
-	||	(Y[i] * err_i >  toler && lamb[i] > 0)
+bool SupportVectorMachines_SMO(Mat<>& X, int* y, int i, double& b, Mat<>& lamb, double C, double toler, Mat<>& kernelMat, Mat<>& error) {
+	double err_i = calcError(i, X, y, lamb, b, kernelMat);
+	if( (y[i] * err_i < -toler && lamb[i] < C)
+	||	(y[i] * err_i >  toler && lamb[i] > 0)
 	) {
-		//1. select λ_j
-		selectLambda_j(j, err_j);
-		double lamb_i_old = lamb[i];
-		double lamb_j_old = lamb[j];
-		//2. L,H
-		double L = Y[i] != Y[j] ? std::max(0, lamb[j] - lamb[i])    : std::max(0, lamb[j] + lamb[i] - C);
-			   H = Y[i] != Y[j] ? std::min(C, lamb[j] - lamb[i] + C): std::min(C, lamb[j] + lamb[i]);
-		if (L == H) return 0;
-		//3: calculate eta (the similarity of sample i and j)
-		double eta = 2 * kernelMat(i, j) - kernelMat(i, i) - kernelMat(i, j);
-		if (eta >= 0) return 0;
+		//1.select λ_i, λ_j,  calcu err_i, err_ j
+		double err_j;
+		int j = selectLambda_j(i, err_i, err_j, X, y, lamb, kernelMat, b);
+		double lamb_i_old = lamb[i],
+			   lamb_j_old = lamb[j];
+		//3. к_ii+к_jj-2к_ij, L, H
+		double K = 2 * kernelMat(i, j) - kernelMat(i, i) - kernelMat(j, j),
+			   L = y[i] != y[j] ? std::max(0.0,lamb[j] - lamb[i])    : std::max(0.0,lamb[j] + lamb[i] - C),
+			   H = y[i] != y[j] ? std::min(C,  lamb[j] - lamb[i] + C): std::min(C,  lamb[j] + lamb[i]);
+		if (K >= 0 || L == H) return 0;
 		//4. update & clip λ_j, update λ_i
-		lamb[j] -= Y[j] * (err_i - err_j) / eta;
-		lamb[j] = lamb[j] < H ? lamb[j] : H;
-		lamb[j] = lamb[j] > L ? lamb[j] : L;
-		lamb[i] += Y[i] * Y[j] * (lamb_j_old - lamb[j]);
-		//5. if alpha j not moving enough, just return		
+		lamb[j] -= y[j] * (err_i - err_j) / K;
+		lamb[j] = lamb[j] < H ? (lamb[j] > L ? lamb[j] : L) : H;
+		lamb[i] += y[i] * y[j] * (lamb_j_old - lamb[j]);
+		//5. if alpha j not moving enough, just return
 		if (abs(lamb_j_old - lamb[j]) < 1e-5) {
-			updateError(j); return 0;
+			error[j] = err_j; return 0;
 		}
 		//6. update b
-		double b1 = Y[i] * (lamb[i] - lamb_i_old) * kernelMat(i, i)
-				  - Y[j] * (lamb[j] - lamb_j_old) * kernelMat(i, j);
-		double b2 = Y[i] * (lamb[i] - lamb_i_old) * kernelMat(i, j)
-				  - Y[j] * (lamb[j] - lamb_j_old) * kernelMat(j, j);
+		double b1 = y[i] * (lamb[i] - lamb_i_old) * kernelMat(i, i)
+				  - y[j] * (lamb[j] - lamb_j_old) * kernelMat(i, j);
+		double b2 = y[i] * (lamb[i] - lamb_i_old) * kernelMat(i, j)
+				  - y[j] * (lamb[j] - lamb_j_old) * kernelMat(j, j);
 		b = (lamb[i] > 0 && lamb[i] < C) ? b1 : ((lamb[j] > 0 && lamb[j] < C) ? b2 : (b1 + b2) / 2);
-		updateError(i);
-		updateError(j);
+		error[i] = err_i;
+		error[i] = err_i;
 		return 1;
 	} return 0;
 }
-void SupportVectorMachines(Mat<>& X, Mat<int>& Y，int maxIter = 100) {
+double SupportVectorMachines(Mat<>& X, int* y, Mat<>& w, double C, double toler, double(*kernel)(Mat<>& a, Mat<>& b), int maxIter = 100) {
 	int N = X.cols;
-	Mat<> lamb(X);
-	// Iteration termination condition :
-		//Condition 1: reach max iteration
-		//Condition 2: no alpha changed after going through all samples, all alpha(samples) fit KKT condition
-	for (int iter = 0; iter < maxIter; iter++) {
-		double lambPairsChanged = 0;
-		for (int i = 0; i < N; i++) {
-			lambPairsChanged = SupportVectorMachines_SMO(i);
+	double b;
+	// kernel matrix
+	Mat<> kernelMat(N, N), error(N), tmp1, tmp2;
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			kernelMat(i, j) = kernel(X.getRow(i, tmp1), X.getRow(j, tmp2));
 		}
 	}
+	// λ*
+	Mat<> tmp, lamb(X);
+	for (int iter = 0; iter < maxIter; iter++) {
+		bool lambPairsChanged = 0;
+		for (int i = 0; i < N; i++) {
+			lambPairsChanged = SupportVectorMachines_SMO(X, y, i, b, lamb, C, toler, kernelMat, error);
+		}
+		if (lambPairsChanged) break;
+	}
+	// w*,b*
+	w.zero(X.rows);
+	for (int i = 0; i < N; i++) {
+		for (int dim = 0; dim < X.rows; dim++) {
+			w[dim] += X(dim, i) * lamb[dim] * y[dim];
+		}
+	}
+	return b;
 };
