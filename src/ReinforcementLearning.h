@@ -121,8 +121,14 @@ public:
 			min		||w||² / 2
 			s.t.	y_i (w^T x_i + b) ≥ 1
 	[步骤]:
-		(1) 计算λ*
-		(2) 计算 w*, b*
+		(1)	计算核矩阵
+		(2) 计算λ*
+			(2.1) 选择 i
+			(2.2) 选择 j
+			(2.3) 计算 к_ii+к_jj-2к_ij, L, H
+			(2.4) 更新 λ_j, λ_i
+			(2.5) 更新 b
+		(3) 计算 w*, b*
 	[原理]:
 		(1) 超平面方程: w^T x + b = 0
 			点面距: d = |w^T x + b| / ||w||
@@ -173,7 +179,7 @@ public:
 			更新b:
 		(8)	软间隔:
 ******************************************************************************/
-bool SupportVectorMachines_SMO(Mat<>& X, int* y, int i, double& b, Mat<>& lamb, double C, double toler, Mat<>& kernelMat) {
+int SupportVectorMachines_SMO(Mat<>& X, int* y, int i, double& b, Mat<>& lamb, double& C, double& toler, Mat<>& kernelMat) {
 	// error[]
 	static Mat<> err(X.cols);
 	for (int k = 0; k < err.size(); k++) {
@@ -197,12 +203,12 @@ bool SupportVectorMachines_SMO(Mat<>& X, int* y, int i, double& b, Mat<>& lamb, 
 		double lamb_i_old = lamb[i],
 			   lamb_j_old = lamb[j];
 		//2.к_ii+к_jj-2к_ij, L, H
-		double K = 2 * kernelMat(i, j) - kernelMat(i, i) - kernelMat(j, j),
+		double K =  kernelMat(i, i) + kernelMat(j, j) - 2 * kernelMat(i, j),
 			   L = y[i] != y[j] ? std::max(0.0,lamb[j] - lamb[i])    : std::max(0.0,lamb[j] + lamb[i] - C),
 			   H = y[i] != y[j] ? std::min(C,  lamb[j] - lamb[i] + C): std::min(C,  lamb[j] + lamb[i]);
-		if (K >= 0 || L == H) return 0;
+		if (K <= 0 || L == H) return 0;
 		//3.λ_j, λ_i
-		lamb[j] -= y[j] * (err[i] - err[j]) / K;
+		lamb[j] += y[j] * (err[i] - err[j]) / K;
 		lamb[j] = lamb[j] < H ? (lamb[j] > L ? lamb[j] : L) : H;
 		lamb[i] += y[i] * y[j] * (lamb_j_old - lamb[j]);
 		if (abs(lamb_j_old - lamb[j]) < 1e-5) return 0;
@@ -221,29 +227,26 @@ double SupportVectorMachines(Mat<>& X, int* y, Mat<>& w, double C, double toler,
 	// kernel matrix
 	Mat<> kernelMat(N, N), tmp1, tmp2; 
 	for (int i = 0; i < N; i++) {
+		X.getCol(i, tmp1);
 		for (int j = 0; j < N; j++) {
-			kernelMat(i, j) = kernel(X.getCol(i, tmp1), X.getCol(j, tmp2));
+			kernelMat(i, j) = kernel(tmp1, X.getCol(j, tmp2));
 		}
 	}
 	// λ*
-	Mat<> lamb(X.rows);
-	for (int iter = 0; iter < maxIter; iter++) {
-		bool lambPairsChanged = 0;
-		for (int i = 0; i < N; i++) {
-			lambPairsChanged = ~SupportVectorMachines_SMO(X, y, i, b, lamb, C, toler, kernelMat);
-		}
-		if (lambPairsChanged) break;
+	Mat<> lamb(N);
+	for (int iter = 0; iter < maxIter; ) {
+		int pair_changed = 0;
+		for (int i = 0; i < N; i++)
+			pair_changed += SupportVectorMachines_SMO(X, y, i, b, lamb, C, toler, kernelMat);
+		if (pair_changed == 0) iter++;
+		else iter = 0;
 	}
 	// w*,b*
 	w.zero(X.rows);
 	for (int i = 0; i < N; i++) {
 		for (int dim = 0; dim < X.rows; dim++) {
-			w[dim] += X(dim, i) * lamb[dim] * y[dim];
+			w[dim] += X(dim, i) * lamb[i] * y[i];
 		}
 	}
-
-	for (int i = 0; i < w.size(); i++)
-		printf("%f ", w[i]);
-	printf("\n%f \n", b);
 	return b;
 };
