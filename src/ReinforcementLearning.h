@@ -192,7 +192,7 @@ int SupportVectorMachines_SMO(Mat<>& X, int* y, int i, double& b, Mat<>& lamb, d
 	if( (y[i] * err[i] < -toler && lamb[i] < C)
 	||	(y[i] * err[i] >  toler && lamb[i] > 0)
 	) {
-		//1.j, err_i, err_ j
+		//1.j
 		int j = -1;
 		double maxErr = 0;
 		for (int k = 0; k < err.size(); k++) {
@@ -200,10 +200,10 @@ int SupportVectorMachines_SMO(Mat<>& X, int* y, int i, double& b, Mat<>& lamb, d
 			maxErr = maxErr > abs(err[k] - err[i]) ? maxErr : (j = k, abs(err[k] - err[i]));
 		}
 		if (j == -1) { while ((j = rand() % X.cols) == i); }
-		double lamb_i_old = lamb[i],
-			   lamb_j_old = lamb[j];
 		//2.к_ii+к_jj-2к_ij, L, H
-		double K =  kernelMat(i, i) + kernelMat(j, j) - 2 * kernelMat(i, j),
+		double lamb_i_old = lamb[i],
+			   lamb_j_old = lamb[j],
+			   K =  kernelMat(i, i) + kernelMat(j, j) - 2 * kernelMat(i, j),
 			   L = y[i] != y[j] ? std::max(0.0,lamb[j] - lamb[i])    : std::max(0.0,lamb[j] + lamb[i] - C),
 			   H = y[i] != y[j] ? std::min(C,  lamb[j] - lamb[i] + C): std::min(C,  lamb[j] + lamb[i]);
 		if (K <= 0 || L == H) return 0;
@@ -223,7 +223,6 @@ int SupportVectorMachines_SMO(Mat<>& X, int* y, int i, double& b, Mat<>& lamb, d
 }
 double SupportVectorMachines(Mat<>& X, int* y, Mat<>& w, double C, double toler, double(*kernel)(Mat<>& a, Mat<>& b), int maxIter = 100) {
 	int N = X.cols;
-	double b;
 	// kernel matrix
 	Mat<> kernelMat(N, N), tmp1, tmp2; 
 	for (int i = 0; i < N; i++) {
@@ -233,7 +232,8 @@ double SupportVectorMachines(Mat<>& X, int* y, Mat<>& w, double C, double toler,
 		}
 	}
 	// λ*
-	Mat<> lamb(N);
+	Mat<> lamb(N); 
+	double b;
 	for (int iter = 0; iter < maxIter; ) {
 		int pair_changed = 0;
 		for (int i = 0; i < N; i++)
