@@ -15,7 +15,7 @@ limitations under the License.
 #include <algorithm>
 #include <vector>
 /******************************************************************************
-[QLearning]
+[Q Learning]
 	[定义]:Q(s,a) = (1 + lr)·Q(s,a) + lr·( R + g·max Q(s',:) )
 			s: state	a: action	R: reward	lr: learning rate	g: forget factor
 	[原理]:
@@ -72,9 +72,9 @@ public:
 	}
 };
 /******************************************************************************
-*                    Deep Q Network
-*	[思想]: Q-Learning + Neural Network
-		[Loss Function]: 近似值和真实值的均方差
+[Deep Q Networks]
+*	[思想]: Q-Learning + 神经网络
+		[损失函数]: 近似值和真实值的均方差
 *	[流程]:
 	[1] Initialize replay memory D to capacity N
 		Initialize action-value function Q with random weights θ
@@ -93,7 +93,7 @@ public:
 			[] Perform a gradient descent step on (9j - Q(Φj, aj; 0))2 with respect to the weights θ
 			[] Every C steps reset Q=Q
 ******************************************************************************/
-class DeepQNetwork {
+class DeepQNetworks {
 public:
 	double learnRate = 0.6,
 		forgetRate = 0.8,
@@ -113,127 +113,4 @@ public:
 	/*---------------- 反馈学习 ----------------*/
 	void backward(int state, int action, double reward, int& preState) {
 	}
-};
-/******************************************************************************
-[支持向量机]: Support Vector Machines 
-	[目标]: 找到目标超平面, 使得所有样本点间隔最小值γmin = min γi最大.
-	[优化问题]: 凸二次规划问题
-			min		||w||² / 2
-			s.t.	y_i (w^T x_i + b) ≥ 1
-	[步骤]:
-		(1)	计算核矩阵
-		(2) 计算λ*
-			(2.1) 选择 i
-			(2.2) 选择 j
-			(2.3) 计算 к_ii+к_jj-2к_ij, L, H
-			(2.4) 更新 λ_j, λ_i
-			(2.5) 更新 b
-		(3) 计算 w*, b*
-	[原理]:
-		(1) 超平面方程: w^T x + b = 0
-			点面距: d = |w^T x + b| / ||w||
-		(2) 分类
-				w^T x_i + b ≥ +1		(y_i = +1)
-				w^T x_i + b <= -1		(y_i = -1)
-			=>	y_i (w^T x_i + b) ≥ 1
-		(3) 间隔: 离超平面最近的2个异类样本点到超平面的距离之和.
-				Δ = 2 / ||w||
-		(4) 优化问题构造: 使间隔最大化. 凸二次规划问题
-				max  2 / ||w||    <=>    min  ||w||² / 2
-			=>	min		||w||² / 2
-				s.t.	y_i (w^T x_i + b) ≥ 1
-		(5) 计算最优点: 
-			Lagrange函数	
-				L(w, b,λ) = ||w||² / 2 + Σλ_i (1 - y_i (w^T x_i + b))
-				L(w, b,λ)求导, 当导数为0时, 取得极值
-				=>	w* = Σ λ_i y_i x_i		0 = Σ λ_i y_i
-			Lagrange对偶	
-				G(λ) = Lx(w*, b*, λ) = Σλ_i - 1/2 Σ_i Σ_j λ_i λ_j y_i y_j x_i^T x_j
-			对偶问题: 二次规划问题	
-				max		G(λ)
-				s.t.	λ≥0		Σ λ_i y_i = 0
-				=>	Sequential Minimal Optimization算法求解λ*
-			KKT条件
-				λ≥0    y_i (w^T x_i + b) - 1 ≥ 0    λ_i(y_i(w^T x_i + b) - 1) = 0
-		(6) 核函数:将样本从原始空间映射到更高维特征空间,使得其线性可分.
-			=>	超平面方程: w^T Φ(x) + b = 0
-				min		||w||² / 2
-				s.t.	y_i (w^T Φ(x_i) + b) ≥ 1
-				G(λ) = Σλ_i - 1/2 Σ_i Σ_j λ_i λ_j y_i y_j Φ(x_i)^T Φ(x_j)
-			=>	设 核函数к(x_i, x_j) = Φ(x_i)^T Φ(x_j)
-				f(x) = w*^T x + b = Σ λ_i y_i к(x, x_i) + b
-			*	к是核函数 <=> 核矩阵[a_ij = к(x_i, x_j)]总是半正定
-		(7) Sequential Minimal Optimization算法
-			∵	λ是n-1自由度, 确定前n-1个量, 则第n个由Σ λ_i y_i = 0自动确定.
-			∴	每次选2个λ_i λ_j, 固定其他λ_k不变, 优化λ_i λ_j, 更新b
-			优化λ_i λ_j:
-			=>	λ_i = (-Σ_{k≠i≠j} λ_k y_k)·y_1 - λ_j y_i y_j = ζ y_1 - λ_j y_i y_j
-				G(λ_j) = (λ_j + ζ y_1 - λ_j y_i y_j) + C - v_i (ζ-λ_j y_j) - v_j λ_j y_j 
-						- 1/2 к_ii (ζ-λ_j y_j)² - 1/2 к_jj λ_j² - к_ij λ_j y_j (ζ-λ_j y_j)²
-				其中 v_i = Σ_{k≠i≠j} λ_i y_i к_ki = f(x_i) - λ_i y_i к_ii -λ_j y_j к_ij - b, v_j同理
-				∂G/∂λ_j = -(к_ii+к_jj-2к_ij)(λ_j^old - λ_j^new) + y_j(y_j-y_i+f(x_i)-f(x_j)) = 0
-			=>	λ_j^new = λ_j^old + y_j (E_i - E_j)/(к_ii+к_jj-2к_ij)		其中E_i = f(x_i) - y_i
-			修剪: 使得λ_j* 满足约束条件, λ_j应当∈[L,H]:
-				y_i≠y_j时,	下界L = max(0,λ_j^old-λ_i^old)	,上界L = min(C,λ_j^old-λ_i^old + C)
-				y_i= y_j时,	下界L = max(0,λ_j^old+λ_i^old - C),上界L = min(C,λ_j^old+λ_i^old)
-			更新b:
-		(8)	软间隔:
-******************************************************************************/
-int SupportVectorMachines_SMO(Mat<>& X, int* y, int i, double& b, Mat<>& lamb, double& C, double& toler, Mat<>& kernelMat) {
-	//1.j
-	int j; while ((j = rand() % X.cols) == i); 
-	//2. error
-	double err_i = b - y[i], err_j = b - y[j];
-	for (int k = 0; k < lamb.size(); k++) {
-		err_i += lamb[k] * y[k] * kernelMat(i, k);
-		err_j += lamb[k] * y[k] * kernelMat(j, k);
-	}
-	//2.к_ii+к_jj-2к_ij, L, H
-	double lamb_i_old = lamb[i],
-			lamb_j_old = lamb[j],
-			K =  kernelMat(i, i) + kernelMat(j, j) - 2 * kernelMat(i, j),
-			L = y[i] != y[j] ? std::max(0.0,lamb[j] - lamb[i])    : std::max(0.0,lamb[j] + lamb[i] - C),
-			H = y[i] != y[j] ? std::min(C,  lamb[j] - lamb[i] + C): std::min(C,  lamb[j] + lamb[i]);
-	if (K <= 0 || L == H) return 0;
-	//3.λ_j, λ_i
-	lamb[j] += y[j] * (err_i - err_j) / K;
-	lamb[j] = lamb[j] < H ? (lamb[j] > L ? lamb[j] : L) : H;
-	lamb[i] += y[i] * y[j] * (lamb_j_old - lamb[j]);
-	if (abs(lamb_j_old - lamb[j]) < 1e-5) return 0;
-	//4.b
-	double bi = - y[i] * (lamb[i] - lamb_i_old) * kernelMat(i, i)
-				- y[j] * (lamb[j] - lamb_j_old) * kernelMat(i, j) - err_i + b,
-		   bj = - y[i] * (lamb[i] - lamb_i_old) * kernelMat(i, j)
-				- y[j] * (lamb[j] - lamb_j_old) * kernelMat(j, j) - err_j + b;
-	b = (lamb[i] > 0 && lamb[i] < C) ? bi : ((lamb[j] > 0 && lamb[j] < C) ? bj : (bi + bj) / 2);
-	return 1;
-}
-double SupportVectorMachines(Mat<>& X, int* y, Mat<>& w, Mat<>& lamb, double C, double toler, double(*kernel)(Mat<>& a, Mat<>& b), int maxIter = 100) {
-	int N = X.cols;
-	// kernel matrix
-	Mat<> kernelMat(N, N), tmp1, tmp2; 
-	for (int i = 0; i < N; i++) {
-		X.getCol(i, tmp1);
-		for (int j = 0; j < N; j++) {
-			kernelMat(i, j) = kernel(tmp1, X.getCol(j, tmp2));
-		}
-	}
-	// λ*
-	lamb.zero(N); 
-	double b;
-	for (int iter = 0; iter < maxIter; ) {
-		int pair_changed = 0;
-		for (int i = 0; i < N; i++)
-			pair_changed += SupportVectorMachines_SMO(X, y, i, b, lamb, C, toler, kernelMat);
-		if (pair_changed == 0) iter++;
-		else iter = 0;
-	}
-	// w*,b*
-	w.zero(X.rows);
-	for (int i = 0; i < N; i++) {
-		for (int dim = 0; dim < X.rows; dim++) {
-			w[dim] += X(dim, i) * lamb[i] * y[i];
-		}
-	}
-	return b;
 };

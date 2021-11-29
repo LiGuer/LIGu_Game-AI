@@ -22,7 +22,7 @@ limitations under the License.
 		[4] backpropagation.
 ******************************************************************************/
 template<class State>
-class MontecarloTreeSearch {
+class MonteCarloTreeSearch {
 public:
 	/*--------------------------------------------------------------------------------
 						Montecarlo 树节点
@@ -50,7 +50,7 @@ public:
 				[3]随机生成新状态函数指针	[4]判断输赢函数指针
 	--------------------------------------------------------------------------------*/
 	TreeNode root;
-	int  maxSearchTimes = 1E5;
+	int  maxSearchTimes;
 	bool(*newStateRandFunc)	(State&, State&, bool);			//随机生成新状态
 	char(*judgeWin)	        (State&);						//判断输赢
 	/*--------------------------------------------------------------------------------
@@ -59,7 +59,7 @@ public:
 			[1]随机生成新状态函数指针	(状态, 新状态, 是否模拟标志)
 			[2]判断输赢函数指针			(状态)
 	--------------------------------------------------------------------------------*/
-	MontecarloTreeSearch(
+	MonteCarloTreeSearch(
 		bool(*_newStateRandFunc)(State&, State&, bool),
 		char(*_judgeWin)		(State&),
 		int _maxSearchTimes = 1E5
@@ -79,6 +79,7 @@ public:
 	State* run(State* state) {
 		root.state = state;
 		for (int i = 0; i < maxSearchTimes; i++) {
+			if (i % 10000 == 0) printf("%d\n", i);
 			TreeNode* expandNode = TreePolicy(&root);		//[1][2]
 			if (expandNode == NULL) break;
 			Backpropagation(								//[4]
@@ -168,9 +169,8 @@ public:
 	int Simulation(State* state) {
 		State newState = *state;
 		int reward = 0;
-		while ((reward = judgeWin(newState)) == 0) 
-			if (!newStateRandFunc(newState, newState, true))
-				break;
+		while ((reward = judgeWin(newState)) == 0)
+			newStateRandFunc(newState, newState, true);
 		return reward;
 	}
 	/*--------------------------------[ [4]Backpropagation 回溯 ]--------------------------------
