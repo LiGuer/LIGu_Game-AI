@@ -7,9 +7,12 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QKeyEvent>
+#include <QThread> 
 #include <stdio.h>
 #include "C:/Users/29753/Desktop/Projects/Games/src/Go/Go.h"
 #include "BoardClass.h"
+#include "ThreadClass.h"
+#include "Go_AI.h"
 
 class StoneClass : public QWidget
 {
@@ -24,11 +27,16 @@ private:
     QWidget* w;
 
     const int stoneSize = BoardClass::gridSize * 0.8;
+    int ai_is_open = 0;
+
     QLabel* Stone[361];
     QLabel* StoneWarn = new QLabel(this);
     QLabel* WinLable  = new QLabel(this);
 
     Go::State* state = new Go::State();
+
+    void openAI();
+    void aiEvaluate();
 
     void printStone(Mat<Go::Stone>& Board);
     void printWin(int win);

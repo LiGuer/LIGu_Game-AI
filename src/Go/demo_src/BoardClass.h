@@ -74,15 +74,15 @@ protected:
 
         int starSize = gridSize / 4,
             star[][2] = {
-                { 4, 4}, { 4,10}, { 4,16},
-                {10, 4}, {10,10}, {10,16},
-                {16, 4}, {16,10}, {16,16},
+                {-6,-6}, {-6, 0}, {-6, 6},
+                { 0,-6}, { 0, 0}, { 0, 6},
+                { 6,-6}, { 6, 0}, { 6,16},
             };
 
         for (int i = 0; i < 9; i++) {
             painter.drawEllipse(
-                boardMargin + gridSize * (star[i][0] - 1) - starSize / 2,
-                boardMargin + gridSize * (star[i][1] - 1) - starSize / 2,
+                boardMargin + gridSize * (star[i][0] + BOARDSIZE / 2) - starSize / 2,
+                boardMargin + gridSize * (star[i][1] + BOARDSIZE / 2) - starSize / 2,
                 starSize, starSize
             );
         }

@@ -10,7 +10,7 @@
 using namespace std;
 
 namespace Go {
-#define BOARDSIZE 19
+#define BOARDSIZE 9
 #define BLACK  1
 #define WHITE -1
 #define BANPOINT 0x7FFF
@@ -43,6 +43,7 @@ namespace Go {
 			board  = x.board;
 			mark   = x.mark;
 			qi     = x.qi;
+			parent = x.parent;
 			return *this;
 		}
 	};
@@ -152,25 +153,39 @@ namespace Go {
 	/*
 	 *  输赢判定
 	 */
-	static char judgeWin(State& state) {	//[RULE 4]:局势判定(数子法)
+	static char judgeWin(State& s) {	//[RULE 4]:局势判定(数子法)
 		short ScoreBlack = 0;
-
+		/*for (int i = 0; i < BOARDSIZE; i++) {
+			for (int j = 0; j < BOARDSIZE; j++) {
+				if (s.board[i * BOARDSIZE + j] == 1)
+					printf(" x");
+				if (s.board[i * BOARDSIZE + j] == 0)
+					printf(" .");
+				if (s.board[i * BOARDSIZE + j] == -1)
+					printf(" o");
+			}printf("\n");
+		}printf("\n");
+		for (int i = 0; i < BOARDSIZE; i++) {
+			for (int j = 0; j < BOARDSIZE; j++) {
+				printf("%6d ", s.mark[i * BOARDSIZE + j]);
+			}printf("\n\n");
+		}printf("\n");
+		
 		if (state.action != -1 || 
-		   (state.parent != NULL &&
-			state.parent->action != -1)
-		) 
-			return 0;
+		   (s.parent != NULL &&
+			s.parent->action != -1)
+		) return 0;*/
 
-		for (int i = 0; i < state.board.size(); i++) {
-			if (state.mark[i] == -1) 
+		for (int i = 0; i < s.board.size(); i++) {
+			if (s.mark[i] == -1) 
 				return 0;
 
-			if (state.board[i] == BLACK || 
-				state.mark[i]  == BANPOINT * WHITE ||
-				state.mark [i] == EYEPOINT * BLACK
+			if (s.board[i] == BLACK || 
+				s.mark[i]  == BANPOINT * WHITE ||
+				s.mark [i] == EYEPOINT * BLACK
 				) ScoreBlack++;
 		}
-		return ScoreBlack >= 184 ? BLACK : WHITE;		//贴子
+		return ScoreBlack >= BOARDSIZE * BOARDSIZE / 2.0 + 3.75 ? BLACK : WHITE;		//贴子 184
 	}
 
 	/*
