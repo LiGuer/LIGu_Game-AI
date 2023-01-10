@@ -10,7 +10,7 @@
 using namespace std;
 
 namespace Go {
-#define BOARDSIZE 9
+#define BOARDSIZE 13
 #define BLACK  1
 #define WHITE -1
 #define BANPOINT 0x7FFF
@@ -55,14 +55,14 @@ namespace Go {
 	/*
 	 *  棋块识别, Union-Find Set
 	 */
-	static short find(Mat<short>& mark, short a) {
+	inline short find(Mat<short>& mark, short a) {
 		if (mark[a] != a) {
 			mark[a] = find(mark, mark[a]);
 		}
 		return mark[a];
 	};
 
-	static void detectBlock(Mat<Stone>& board, Mat<short>& mark) {
+	inline void detectBlock(Mat<Stone>& board, Mat<short>& mark) {
 		for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
 			mark[i] = i;
 		}
@@ -102,10 +102,10 @@ namespace Go {
 	/*
 	 *  棋块数气 
 	 */
-	static void countQi(Mat<Stone>& board, Mat<short>& qi, Mat<short>& mark) {
+	inline void countQi(Mat<Stone>& board, Mat<short>& qi, Mat<short>& mark) {
 		qi.zero();
 
-		static int buf[4], bufcur;
+		int buf[4], bufcur;
 
 		for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
 			if (board[i] != 0) continue;
@@ -135,7 +135,7 @@ namespace Go {
 	/*
 	 *  禁止全局同形
 	 */
-	static bool judgeJie(State& state) {
+	inline bool judgeJie(State& state) {
 		State* s = &state;
 
 		for (int i = 0; i <= 2; i++) {
@@ -153,25 +153,9 @@ namespace Go {
 	/*
 	 *  输赢判定
 	 */
-	static char judgeWin(State& s) {	//[RULE 4]:局势判定(数子法)
+	inline char judgeWin(State& s) {	//[RULE 4]:局势判定(数子法)
 		short ScoreBlack = 0;
-		/*for (int i = 0; i < BOARDSIZE; i++) {
-			for (int j = 0; j < BOARDSIZE; j++) {
-				if (s.board[i * BOARDSIZE + j] == 1)
-					printf(" x");
-				if (s.board[i * BOARDSIZE + j] == 0)
-					printf(" .");
-				if (s.board[i * BOARDSIZE + j] == -1)
-					printf(" o");
-			}printf("\n");
-		}printf("\n");
-		for (int i = 0; i < BOARDSIZE; i++) {
-			for (int j = 0; j < BOARDSIZE; j++) {
-				printf("%6d ", s.mark[i * BOARDSIZE + j]);
-			}printf("\n\n");
-		}printf("\n");
-		
-		if (state.action != -1 || 
+		/*if (state.action != -1 || 
 		   (s.parent != NULL &&
 			s.parent->action != -1)
 		) return 0;*/
@@ -180,8 +164,9 @@ namespace Go {
 			if (s.mark[i] == -1) 
 				return 0;
 
-			if (s.board[i] == BLACK || 
-				s.mark[i]  == BANPOINT * WHITE ||
+			if((s.board[i] == BLACK && s.qi[s.mark[i]] >  1) ||
+			   (s.board[i] == WHITE && s.qi[s.mark[i]] == 1) ||
+				s.mark [i] == BANPOINT * WHITE ||
 				s.mark [i] == EYEPOINT * BLACK
 				) ScoreBlack++;
 		}
@@ -191,7 +176,7 @@ namespace Go {
 	/*
 	 *  禁入点标记
 	 */
-	static void judgeBan(Mat<Stone>& board, Mat<short>& qi, Mat<short>& mark, Stone player) {
+	inline void judgeBan(Mat<Stone>& board, Mat<short>& qi, Mat<short>& mark, Stone player) {
 		for (int i = 0; i < board.size(); i++) {
 			if (board[i] != 0) continue;
 
@@ -221,7 +206,7 @@ namespace Go {
 		}
 	}
 
-	static void judgeBanAndEye(Mat<Stone>& board, Mat<short>& qi, Mat<short>& mark, Stone player) {
+	inline void judgeBanAndEye(Mat<Stone>& board, Mat<short>& qi, Mat<short>& mark, Stone player) {
 		for (int i = 0; i < board.size(); i++) {
 			if (board[i] != 0) continue;
 
@@ -260,7 +245,7 @@ namespace Go {
 	/*
 	 *  无气提子
 	 */
-	static bool extractStone(Mat<Stone>& board, Mat<short>& qi, Mat<short>& mark, Stone player, short action) {
+	inline bool extractStone(Mat<Stone>& board, Mat<short>& qi, Mat<short>& mark, Stone player, short action) {
 		bool fg = 0;
 
 		for (int j = 0; j < 4; j++) {
@@ -290,7 +275,7 @@ namespace Go {
 	/*
 	 *  落子
 	 */
-	static bool downStone(State& s) {
+	inline bool downStone(State& s) {
 		//落子
 		if (s.board[s.action] != 0 || 
 		    (s.mark[s.action] != -1 && s.mark[s.action] != EYEPOINT && s.mark[s.action] != -EYEPOINT))
@@ -300,12 +285,12 @@ namespace Go {
 
 		bool fg = extractStone(s.board, s.qi, s.mark, s.player, s.action);
 
-		if (1) {
+		if (fg) {
 			detectBlock(s.board, s.mark); 
 			countQi(s.board, s.qi, s.mark);
 		}
 		else {
-			static int buf[4], bufcur;
+			int buf[4], bufcur;
 			
 			bufcur = 0;
 			s.mark[s.action] = s.action;
@@ -357,7 +342,7 @@ namespace Go {
 	/*
 	 *  落子
 	 */
-	static State* nextState(State& s, int x, int y) {
+	inline State* nextState(State& s, int x, int y) {
 		State* s_ = new State();
 		*s_ = s;
 		s_->parent = &s;

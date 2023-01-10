@@ -4,32 +4,34 @@
 #include <random>
 #include <unordered_map>
 #include <algorithm>
+#include <thread>
 #include "C:/Users/29753/Desktop/Projects/Games/src/Go/Go.h"
-#include "C:/Users/29753/Desktop/Projects/Games/src/Algorithm/MontecarloTreeSearch.h"
 
 namespace GoAI { 
 
-	// Node structure for MCTS tree
+	/*
+	 *  Node of Monte-Carlo Tree
+	 */
 	struct Node {
+		// evalution of node
 		int value = 0,
 			visit = 0;
 
 		Go::State* state = NULL;
 		Node* parent = NULL;
 
+		// actions & next states
 		vector<int> actionSet;
-		unordered_map<int, Node*> child; // map of child nodes, indexed by action
+		unordered_map<int, Node*> child;  
 
-		void generateActionSet() { 
-			for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++)
-				if (state->mark[i] == -1)
-					actionSet.push_back(i);
+		// Constructor
+		Node(Go::State* _state, Node* _parent) {
+			state = _state;
+			parent = _parent;
+			generateActionSet();
+		}
 
-			std::random_device rd;
-			std::mt19937 rng(rd()); 
-			std::shuffle(actionSet.begin(), actionSet.end(), rng);
-		}  
-
+		// Destructor, when root is destructed, the entire tree will be destructed automatically 
 		~Node() {
 			// delete all child node except the best node
 			for (auto e = child.begin(); e != child.end(); e++) {
@@ -41,6 +43,17 @@ namespace GoAI {
 			//delete state
 			delete state;
 		}
+
+		// generate action set randomly
+		void generateActionSet() {
+			for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++)
+				if (state->mark[i] == -1)
+					actionSet.push_back(i);
+
+			std::random_device rd;
+			std::mt19937 rng(rd());
+			std::shuffle(actionSet.begin(), actionSet.end(), rng);
+		}
 	};
 
 	Node* Select(Node* node, bool isExplore);
@@ -49,6 +62,9 @@ namespace GoAI {
 	Go::State* nextStateRand_Expand(Node* node);
 	bool nextStateRand_Simulate(Go::State& s);
 
+	/*
+	 *  move to a new root
+	 */
 	inline void move(Node*& root, int a) {
 		// move to new root
 		Node* t = root;
@@ -67,13 +83,12 @@ namespace GoAI {
 	static int evaluate_fg = 0;
 	static vector<double> evaluate_result{ BOARDSIZE * BOARDSIZE };
 
-	// MCTS
+	/*
+	 *  Monte-Carlo Tree Search
+	 */
 	inline void MonteCarloTreeSearch(Go::State* s) {
-		Node* root = new Node, 
+		Node* root = new Node(s, NULL),
 			* current = root;
-
-		root->state = s;
-		root->generateActionSet();
 
 		while (true) {
 			if (move_pos != -1) {
@@ -83,7 +98,7 @@ namespace GoAI {
 			if (evaluate_fg == 1) {
 				evaluate_fg = 0;
 
-				std::fill(evaluate_result.begin(), evaluate_result.end(), 0);
+				fill(evaluate_result.begin(), evaluate_result.end(), 0);
 				
 				for (auto e = root->child.begin(); e != root->child.end(); e++) {
 					if (e->second == NULL)
@@ -100,7 +115,7 @@ namespace GoAI {
 				current = Select(current, true);
 			} 
 
-			// Expand the selected node (if it is not a terminal node)
+			// Expand
 			if (judgeWin(*(current->state)) == 0) {
 				Node* newNode;
 
@@ -110,10 +125,10 @@ namespace GoAI {
 				}
 				current = newNode;
 			}
-
+			
 			// Simulate
 			int reward = Simulate(current->state);
-
+			
 			// Backpropagate
 			while (current != NULL) {
 				current->value += current->state->player == reward ? 1 : -1;
@@ -123,10 +138,12 @@ namespace GoAI {
 		}
 	}
 
+	/*
+	 *  [1] Select
+	 */
 	inline Node* Select(Node* node, bool isExplore) {
 		double maxValue = -DBL_MAX;
-		Node* node_ = NULL;
-		int n = node->child.size();
+		Node* bestNode = NULL;
 
 		for (auto e = node->child.begin(); e != node->child.end(); e++) {
 			if (e->second == NULL)
@@ -138,11 +155,14 @@ namespace GoAI {
 				b = (double)log(node->visit) / e->second->visit,
 				t = a + (isExplore == true ? sqrt(2) : 0) * sqrt(b);
 
-			maxValue = maxValue < t ? (node_ = e->second, t) : maxValue;
+			maxValue = maxValue < t ? (bestNode = e->second, t) : maxValue;
 		}
-		return node_;
+		return bestNode;
 	} 
 
+	/*
+	 *  [2] Expand
+	 */
 	inline bool Expand(Node* node, Node*& newNode) {
 		//New State
 		Go::State* s_;
@@ -151,15 +171,15 @@ namespace GoAI {
 			return false;
 
 		//New Node
-		newNode = new Node;
-		newNode->state = s_;
-		newNode->parent = node;
-		newNode->generateActionSet();
+		newNode = new Node(s_, node);
 		node->child[s_->action] = newNode; 
 
 		return true;
 	}
 
+	/*
+	 *  [3]  Simulate
+	 */
 	inline int Simulate(Go::State* s) {
 		Go::State s_ = *s;
 		int reward = 0;  
@@ -171,6 +191,7 @@ namespace GoAI {
 	}
 
 	inline Go::State* nextStateRand_Expand(Node* node) {
+		// new State
 		Go::State 
 			* s_ = new Go::State(),
 			* s  = node->state;
@@ -178,7 +199,7 @@ namespace GoAI {
 		s_->parent = s;
 		s_->player =-s->player; 
 
-		//[2]
+		// randomly choose an action
 		while (1) { 
 			if (node->actionSet.size() == node->child.size()) {
 				s_->parent = NULL;

@@ -11,11 +11,6 @@ StoneClass::StoneClass(QWidget* parent) : QWidget(parent)
     StoneWarn->setStyleSheet("QLabel{background:#FF0000;}");
     StoneWarn->setGeometry(0, 0, 0, 0);
 
-    QFont font("Times New Roman", 100, 50, true);//字体，大小，粗细（50正常），是否斜体
-    WinLable->setGeometry(0, 0, 0, 0);
-    WinLable->setFont(font);
-    WinLable->setText("");
-
     for (int i = 0; i < 361; i++)
         Stone[i] = new QLabel(this);
 
@@ -126,24 +121,27 @@ void StoneClass::aiEvaluate() {
         fg = 1;
     }
 
-    int maxn = -0x7FFFFFFF;
+    float maxn = -0x7FFFFFFF;
+    int maxi = 0;
 
     if (fg == 1) {
         GoAI::evaluate_fg = 1;
         QThread::msleep(50);
 
         for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++)
-            if (state->mark[i] == -1 || state->mark[i] == EYEPOINT || state->mark[i] == -EYEPOINT)
-                maxn = max(maxn, (int)(GoAI::evaluate_result[i] * 100));
+            if (state->mark[i] == -1 && maxn < GoAI::evaluate_result[i]) {
+                maxn = GoAI::evaluate_result[i];
+                maxi = i;
+            } 
     } 
 
     for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
-        if ((state->mark[i] == -1 || state->mark[i] == EYEPOINT || state->mark[i] == -EYEPOINT) && fg == 1) {
+        if ((state->mark[i] == -1) && fg == 1) {
             int x = i / BOARDSIZE,
                 y = i % BOARDSIZE,
                 v = GoAI::evaluate_result[i] * 100;   
 
-            if(v == maxn)
+            if(i == maxi)
                 labels[i]->setStyleSheet("color:Red");
             else  
                 labels[i]->setStyleSheet("color:Blue");
@@ -166,7 +164,11 @@ void StoneClass::aiEvaluate() {
  */
 void StoneClass::printWin(int win)
 {
-    WinLable->setGeometry(0, 0, 1000, 1000);
+    QFont font("Times New Roman", 50, 50, true);//字体，大小，粗细（50正常），是否斜体
+    WinLable->setGeometry(0, 0, 0, 0);
+    WinLable->setFont(font);
+    WinLable->setGeometry(0, 0, 100, 100);
+
     if (win == BLACK)
         WinLable->setText("BLACK Win");
     else if(win == WHITE)
@@ -219,6 +221,7 @@ void StoneClass::printQi(Go::State& s) {
             labels[i] = new QLabel(w);
             labels[i]->setFont(font);
             labels[i]->setStyleSheet("color:White");
+            labels[i]->setAlignment(Qt::AlignCenter);
         }
         fg = 1;
     }
@@ -230,7 +233,7 @@ void StoneClass::printQi(Go::State& s) {
 
             labels[i]->setText(QString::fromStdString(to_string(s.qi[s.mark[i]])));
             labels[i]->setGeometry(
-                BoardClass::boardMargin + BoardClass::gridSize * (x - (s.qi[s.mark[i]] < 100 ? (s.qi[s.mark[i]] < 10 ? 0.12 : 0.25) : 0.36)),
+                BoardClass::boardMargin + BoardClass::gridSize * (x - 0.36),
                 BoardClass::boardMargin + BoardClass::gridSize * (y - 0.35), 30, 30);
             labels[i]->show();
         }
@@ -252,7 +255,8 @@ void StoneClass::printMark(Go::State& s) {
     if (fg == 0) {
         for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
             labels[i] = new QLabel(w);
-            labels[i]->setFont(font);
+            labels[i]->setFont(font);  
+            labels[i]->setAlignment(Qt::AlignCenter);
         }
         fg = 1;
     }
@@ -264,7 +268,7 @@ void StoneClass::printMark(Go::State& s) {
 
             labels[i]->setText(QString('x'));
             labels[i]->setGeometry(
-                BoardClass::boardMargin + BoardClass::gridSize * (x - 0.12),
+                BoardClass::boardMargin + BoardClass::gridSize * (x - 0.36),
                 BoardClass::boardMargin + BoardClass::gridSize * (y - 0.36), 30, 30);
             labels[i]->setStyleSheet("color:Blue");
             labels[i]->show();
@@ -275,7 +279,7 @@ void StoneClass::printMark(Go::State& s) {
 
             labels[i]->setText(QString('o'));
             labels[i]->setGeometry(
-                BoardClass::boardMargin + BoardClass::gridSize * (x - 0.12),
+                BoardClass::boardMargin + BoardClass::gridSize * (x - 0.36),
                 BoardClass::boardMargin + BoardClass::gridSize * (y - 0.36), 30, 30);
             labels[i]->setStyleSheet("color:Blue");
             labels[i]->show();
@@ -286,7 +290,7 @@ void StoneClass::printMark(Go::State& s) {
 
             labels[i]->setText(QString::fromStdString(to_string(s.mark[i])));
             labels[i]->setGeometry(
-                BoardClass::boardMargin + BoardClass::gridSize * (x - (s.mark[i] < 100 ? (s.mark[i] < 10 ? 0.12 : 0.25) : 0.36)),
+                BoardClass::boardMargin + BoardClass::gridSize * (x - 0.36),
                 BoardClass::boardMargin + BoardClass::gridSize * (y - 0.35), 30, 30);
             labels[i]->setStyleSheet("color:White");
             labels[i]->show();
@@ -310,6 +314,7 @@ void StoneClass::printNumber(Go::State& s) {
             labels[i] = new QLabel(w);
             labels[i]->setFont(font);
             labels[i]->setStyleSheet("color:White");
+            labels[i]->setAlignment(Qt::AlignCenter);
         }
         fg = 1;
     }
@@ -338,7 +343,7 @@ void StoneClass::printNumber(Go::State& s) {
 
             labels[i]->setText(QString::fromStdString(to_string(number[i])));
             labels[i]->setGeometry(
-                BoardClass::boardMargin + BoardClass::gridSize * (x - (number[i] < 100 ? (number[i] < 10 ? 0.12 : 0.25) : 0.36)),
+                BoardClass::boardMargin + BoardClass::gridSize * (x - 0.36),
                 BoardClass::boardMargin + BoardClass::gridSize * (y - 0.35), 30, 30);
             labels[i]->show();
         }
