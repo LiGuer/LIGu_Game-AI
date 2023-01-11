@@ -12,7 +12,6 @@
 #include "C:/Users/29753/Desktop/Projects/Games/src/Go/Go.h"
 #include "BoardClass.h"
 #include "ThreadClass.h"
-#include "Go_AI.h"
 
 class StoneClass : public QWidget
 {
@@ -37,6 +36,7 @@ private:
 
     void openAI();
     void aiEvaluate();
+    void aiEvaluate_visit();
 
     void printStone(Mat<Go::Stone>& Board);
     void printWin(int win);

@@ -240,7 +240,7 @@ namespace GoAI {
 				num++; 
 
 		// randomly choose an action
-		while (1) {
+		while (num > 0) {
 			short index = rand() % num + 1;
 			
 			for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
@@ -253,9 +253,8 @@ namespace GoAI {
 				}
 			}
 
-			if (Go::downStone(s)) { 
+			if (Go::downStone(s))
 				break;
-			}
 			else {  
 				// if this action is invalid
 				num--;
@@ -265,14 +264,9 @@ namespace GoAI {
 				s = oldS[(oldSCur - 1 + 8) % 8];
 				s.player = -s.player;
 				s.parent = &oldS[(oldSCur - 1 + 8) % 8];
-			}
-
-			if (num == 0) {
-				return false;
-			}
+			} 
 		} 
-
-		return true;
+		return num == 0 ? false : true;
 	}
 
 }

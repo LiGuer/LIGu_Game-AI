@@ -17,6 +17,7 @@ StoneClass::StoneClass(QWidget* parent) : QWidget(parent)
     setFocusPolicy(Qt::StrongFocus);
 
     GoAI::evaluate_result.resize(BOARDSIZE * BOARDSIZE, 0);
+    GoAI::evaluate_visit.resize(BOARDSIZE * BOARDSIZE, 0);
 }
 
 /*
@@ -81,6 +82,7 @@ void StoneClass::keyPressEvent(QKeyEvent* event) {
     switch (event->key())    {
     case Qt::Key_A: openAI(); break;
     case Qt::Key_S: aiEvaluate(); break;
+    case Qt::Key_D: aiEvaluate_visit(); break;
     case Qt::Key_Q: printQi(*state); break;
     case Qt::Key_M: printMark(*state); break;
     case Qt::Key_N: printNumber(*state); break;
@@ -145,6 +147,48 @@ void StoneClass::aiEvaluate() {
                 labels[i]->setStyleSheet("color:Red");
             else  
                 labels[i]->setStyleSheet("color:Blue");
+
+            labels[i]->setText(QString::fromStdString(to_string(v)));
+            labels[i]->setGeometry(
+                BoardClass::boardMargin + BoardClass::gridSize * (x - 0.36),
+                BoardClass::boardMargin + BoardClass::gridSize * (y - 0.35), 30, 30);
+            labels[i]->show();
+        }
+        else {
+            labels[i]->hide();
+        }
+    }
+    fg = -fg;
+}
+
+/*
+ *  ÏÔÊ¾AIÆÀ¹À½á¹û
+ */
+void StoneClass::aiEvaluate_visit() {
+    static int fg = 0;
+    static QLabel** labels = new QLabel * [BOARDSIZE * BOARDSIZE];
+    static QFont font("Times New Roman", 8, 50);
+
+    if (fg == 0) {
+        for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
+            labels[i] = new QLabel(w);
+            labels[i]->setFont(font);
+            labels[i]->setAlignment(Qt::AlignCenter);
+            labels[i]->setStyleSheet("color:Blue");
+        }
+        fg = 1;
+    }
+
+    if (fg == 1) {
+        GoAI::evaluate_fg = 1;
+        QThread::msleep(50);
+    }
+
+    for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
+        if ((state->mark[i] == -1) && fg == 1) {
+            int x = i / BOARDSIZE,
+                y = i % BOARDSIZE,
+                v = GoAI::evaluate_visit[i];
 
             labels[i]->setText(QString::fromStdString(to_string(v)));
             labels[i]->setGeometry(
