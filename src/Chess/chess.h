@@ -34,6 +34,13 @@ namespace Chess {
 
         State* parent = NULL;
 
+        // Special Rule Flag
+        int king_move_black = 0,
+            king_move_white = 0,
+            rook_move_black = 0,
+            rook_move_white = 0,
+            pawn_move_two = -1;
+
         State() {
             board.zero(BOARDSIZE, BOARDSIZE);
         }
@@ -82,16 +89,20 @@ namespace Chess {
 
                         s.actionSet[i * 64 + xt * BOARDSIZE + yt] = 1;
                     }
+                    // Castling  
+                    if ((p > 0 && s.king_move_black == 0 && s.rook_move_black == 0) ||
+                        (p < 0 && s.king_move_white == 0 && s.rook_move_white == 0)) {
+                        if (s.board(x, 5) == 0 && s.board(x, 6) == 0)
+                            s.actionSet[i * 64 + x * BOARDSIZE + 6] = -1;
+
+                        if (s.board(x, 1) == 0 && s.board(x, 2) == 0 && s.board(x, 3) == 0)
+                            s.actionSet[i * 64 + x * BOARDSIZE + 2] = -1;
+                    } 
 
                 } break;
                 case QUEEN: case BISHOP: case ROOK: {
-                    int j_st = 0,
-                        j_ed = 8;
-
-                    if (abs(p) == BISHOP)
-                        j_st = 4;
-                    else if (abs(p) == ROOK)
-                        j_ed = 4;
+                    int j_st = abs(p) == BISHOP ? 4 : 0,
+                        j_ed = abs(p) == ROOK   ? 4 : 8;
 
                     for (int j = j_st; j < j_ed; j++) {
                         int t = 0;
@@ -120,70 +131,63 @@ namespace Chess {
                         int xt = x + x_step[j] * 2,
                             yt = y + y_step[j] * 1;
 
-                        if (xt < 0 || xt >= BOARDSIZE ||
-                            yt < 0 || yt >= BOARDSIZE ||
-                            s.board(xt, yt) * p > 0)
-                            continue;
-
-                        s.actionSet[i * 64 + xt * BOARDSIZE + yt] = 1;
+                        if (!(xt < 0 || xt >= BOARDSIZE ||
+                              yt < 0 || yt >= BOARDSIZE || s.board(xt, yt) * p > 0))
+                            s.actionSet[i * 64 + xt * BOARDSIZE + yt] = 1;
 
                         // (1, 2)
                         xt = x + x_step[j] * 1,
                         yt = y + y_step[j] * 2;
 
-                        if (xt < 0 || xt >= BOARDSIZE ||
-                            yt < 0 || yt >= BOARDSIZE ||
-                            s.board(xt, yt) * p > 0)
-                            continue;
-
-                        s.actionSet[i * 64 + xt * BOARDSIZE + yt] = 1;
+                        if (!(xt < 0 || xt >= BOARDSIZE ||
+                              yt < 0 || yt >= BOARDSIZE || s.board(xt, yt) * p > 0))
+                            s.actionSet[i * 64 + xt * BOARDSIZE + yt] = 1;
                     }
                 } break;
                 case PAWN: {
+                    int x_ = x + (p > 0 ? -1 : +1);
+
+                    if (s.board(x_, y) == 0)
+                        s.actionSet[i * 64 + x_ * BOARDSIZE + y] = 1;
+                    if (s.board(x_, y - 1) * p < 0)
+                        s.actionSet[i * 64 + x_ * BOARDSIZE + (y - 1)] = 1;
+                    if (s.board(x_, y + 1) * p < 0)
+                        s.actionSet[i * 64 + x_ * BOARDSIZE + (y + 1)] = 1;
+
                     if (p > 0) {
-                        if (x == BOARDSIZE - 2) {
-                            s.actionSet[i * 64 + (x - 1) * BOARDSIZE + y] = 1;
+                        if (x == BOARDSIZE - 2 && s.board(x - 1, y) == 0 && s.board(x - 2, y) == 0) {
                             s.actionSet[i * 64 + (x - 2) * BOARDSIZE + y] = 1;
-
-                            if (s.board(x - 1, y - 1) * p < 0)
-                                s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (y - 1)] = 1;
-                            if (s.board(x - 1, y + 1) * p < 0)
-                                s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (y + 1)] = 1;
                         }
-                        else if (x > 1) {
-                            s.actionSet[i * 64 + (x - 1) * BOARDSIZE + y] = 1;
-
-                            if(s.board(x - 1, y - 1) * p < 0)
-                                s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (y - 1)] = 1;
-                            if (s.board(x - 1, y + 1) * p < 0)
-                                s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (y + 1)] = 1;
+                        else if (x == 3 && abs(s.pawn_move_two - i) == 1) {
+                            // En passant
+                            s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (s.pawn_move_two % BOARDSIZE)] = -1;
                         }
                         else if (x == 1) {
                             // Promotion
-                            s.actionSet[i * 64 + (x - 1) * BOARDSIZE + y] = 1;
+                            if (s.board(x - 1, y) == 0)
+                                s.actionSet[i * 64 + (x - 1) * BOARDSIZE + y] = -1;
+                            if (s.board(x - 1, y - 1) * p < 0)
+                                s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (y - 1)] = -1;
+                            if (s.board(x - 1, y + 1) * p < 0)
+                                s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (y + 1)] = -1;
                         }
                     }
                     if (p < 0) {
-                        if (x == 1) {
-                            s.actionSet[i * 64 + (x + 1) * BOARDSIZE + y] = 1;
+                        if (x == 1 && s.board(x + 1, y) == 0 && s.board(x + 2, y) == 0) {
                             s.actionSet[i * 64 + (x + 2) * BOARDSIZE + y] = 1;
-
-                            if (s.board(x + 1, y - 1) * p < 0)
-                                s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (y - 1)] = 1;
-                            if (s.board(x + 1, y + 1) * p < 0)
-                                s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (y + 1)] = 1;
                         }
-                        else if (x < BOARDSIZE - 2) {
-                            s.actionSet[i * 64 + (x + 1) * BOARDSIZE + y] = 1;
-
-                            if (s.board(x + 1, y - 1) * p < 0)
-                                s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (y - 1)] = 1;
-                            if (s.board(x + 1, y + 1) * p < 0)
-                                s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (y + 1)] = 1;
+                        else if (x == 4 && abs(s.pawn_move_two - i) == 1) {
+                            // En passant
+                            s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (s.pawn_move_two % BOARDSIZE)] = -1;
                         }
                         else if (x == BOARDSIZE - 2) {
                             // Promotion
-                            s.actionSet[i * 64 + (x + 1) * BOARDSIZE + y] = 1;
+                            if (s.board(x + 1, y) == 0)
+                                s.actionSet[i * 64 + (x + 1) * BOARDSIZE + y] = -1;
+                            if (s.board(x + 1, y - 1) * p < 0)
+                                s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (y - 1)] = -1;
+                            if (s.board(x + 1, y + 1) * p < 0)
+                                s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (y + 1)] = -1;
                         }
                     }
                 }  break;
@@ -194,23 +198,68 @@ namespace Chess {
 
     // move chess
     inline bool moveChess(State& s) {
-        int a = abs(s.action),
+        int a = s.action,
             st = a / 64,
             ed = a % 64;
 
         if (s.actionSet.find(s.action) == s.actionSet.end())
             return false;
 
-        if (s.action > 0) {
+        {   // mark the flag of state
+            s.pawn_move_two = -1;
+            int p = abs(s.board[st]);
+
+            if (p == KING) {
+                if (s.player > 0)
+                    s.king_move_black = 1;
+                if (s.player < 0)
+                    s.king_move_white = 1;
+            }
+            else if (p == ROOK || (p == KING && s.actionSet[s.action] < 0)) {
+                if (s.player > 0)
+                    s.rook_move_black = 1;
+                if (s.player < 0)
+                    s.rook_move_white = 1;
+            }
+            else if (p == PAWN) {
+                if (abs(st / BOARDSIZE - ed / BOARDSIZE) == 2) {
+                    s.pawn_move_two = ed;
+                }
+            }
+        }
+
+        if (s.actionSet[s.action] > 0) {
             s.board[ed] = s.board[st];
             s.board[st] = 0;
         }
         else {
+            // Special Rules
             if (abs(s.board[st]) == KING) {
-                //
+                // Castling  
+                int x = ed / BOARDSIZE,
+                    y = ed % BOARDSIZE;
+
+                swap(s.board[st], s.board[ed]);
+
+                if (y == 6) 
+                    swap(s.board(x, 7), s.board(x, 5));
+                else if (y == 2)
+                    swap(s.board(x, 0), s.board(x, 3));
             }
             if (abs(s.board[st]) == PAWN) {
-                //
+                int x = ed / BOARDSIZE,
+                    y = ed % BOARDSIZE;
+
+                if (x != 0 && x != BOARDSIZE - 1) {
+                    // En passant  
+                    swap(s.board[st], s.board[ed]);
+                    s.board(st / BOARDSIZE, y) = 0;
+                }
+                else {
+                    // Promotion  
+                    s.board[st] = 0;
+                    s.board[ed] = s.player * QUEEN;
+                }
             }
         }
 

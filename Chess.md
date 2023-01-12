@@ -30,7 +30,7 @@
       |||
 
   - Rule 
-    - Movement
+    - Movement, Action Set $\mathcal A$
       - $K$  
         $$A^{(K)} = \{(x, y), (x, y \pm 1), (x \pm 1, y), (x \pm 1, y \pm 1), (x \pm 1, y \mp 1)\}$$
 
