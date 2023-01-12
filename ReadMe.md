@@ -1,7 +1,7 @@
 # LiGu's AI of Game
 
 ## [Go 围棋](Go.md)
-* Algorithm: Montecarlo Tree Search
+* AI Algorithm: [Montecarlo Tree Search](Monte_Carlo_Tree_Search.md)  
 * ![Image text](img/围棋-vs野狐中下12级.png)
 * ![Image text](img/20201122182136.png)
 * Operate
@@ -14,8 +14,8 @@
   - Press key M: display mark and ID of each stone
 
 ## [GoBang 五子棋](Gobang.md) 
-* [Algorithm: Decision Tree, Minimax, alpha-beta Prune](Minimax.md)  
+* AI Algorithm: [Decision Tree, Minimax, alpha-beta Prune](Minimax.md)  
 * ![Image text](img/20201122183254.png)
 
-## Chess 象棋
-* Algorithm: Montecarlo Tree Search
+## [Chess 象棋](Chess.md) 
+* ![Image text](img/Chess_20230112143922.png)

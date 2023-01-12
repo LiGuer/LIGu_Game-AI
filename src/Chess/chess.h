@@ -1,278 +1,223 @@
-/*
-Copyright 2020,2021 LiGuer. All Rights Reserved.
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-	http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-==============================================================================*/
 #ifndef CHESS_H
 #define CHESS_H
-#include <stdlib.h>
+
 #include <stdio.h>
-#include <string.h> 
-#include <algorithm> 
-#include "../../LiGu_AlgorithmLib/Mat.h"
-#include "MontecarloTreeSearch.h"
-/******************************************************************************
-*                    ��������AI  Chess-AI
-------------------------------------------------------------------------------
-*Example:
-	#include "../LiGu_Codes/Daiyu-Go/src/chess.h"
-	int main() {
-		Chess_AI::State board;
-		board.player = -1;
-		Chess_AI::boardInit(board.board);
-		while (true) {
-			board.clear();
-			Chess_AI::run(&board);
-			printf("AI:%d %d\n", board.st, board.ed);
-			for (char x = 0; x < BOARDSIZE; x++) {
-				for (char y = 0; y < BOARDSIZE; y++) {
-					printf("%2d ", board(x, y));
-				}printf("\n");
-			}printf("\n");
-		}
-	}
-******************************************************************************/
-namespace Chess_AI {
+#include <vector>
+#include <unordered_map>
+#include <functional>
+#include <algorithm>
+#include "C:/Users/29753/Desktop/Library/Math/src/Matrix/Mat.h"
+
+using namespace std;
+
+namespace Chess {
 #define BOARDSIZE 8
 #define BLACK  1
 #define WHITE -1
-typedef char Piece;										//����
-enum { King = 1, Queen, Bishop, Knight, Rook, Pawn };	//��,��,��,��,��,��
-/******************************************************************************
-*                    ״̬
-*	[����]: [1]����λ��		[2]����		[3]����
-******************************************************************************/
-struct State {
-	int   st, ed, kidNum = -1;
-	char  player = 0;
-	Piece eat    = 0;
-	std::vector<int> kidIndex, kidList;
-	Mat<Piece> board{ BOARDSIZE ,BOARDSIZE };
-	Piece& operator[](int i)		{ return board[i]; }
-	Piece& operator()(int x, int y) { return board(x, y); }
-	void clear() {
-		kidIndex.clear();
-		kidList .clear();
-		kidNum = -1;
-	}
-};
-/******************************************************************************
-*                    ��������
-******************************************************************************/
-//��������
-bool	newStateRand	(State& state, State& newState, bool isSimulation);
-bool	newStateRand	(State& state);
-char	judgeWin		(State& state);
-int		getNextStep		(Mat<Piece>& board, int pos, int index = -1);
-/*--------------------------------[ ���� ]--------------------------------*/
-void run(State* board) {
-	typedef MontecarloTreeSearch<State> AI;
-	AI ai(
-		newStateRand,
-		judgeWin
-	);
-	*board = *ai.run(board);
-}
-/*--------------------------------------------------------------------------------
-						�����״̬���� New State Rand
-*	[�㷨]: ��������[����]���ڿ��ܵĶ����£����ѡ��һ������
-*	[����]:
-		[1] ȷ��״̬�ռ�����
-			[1.1] ������Ϊ��, ����ʧ��
-		[2] ���ѡ��һ��״̬, ������
---------------------------------------------------------------------------------*/
-// ����Montecarlo[2. ��չ]
-bool newStateRand(State& state, State& newState, bool isSimulation) {
-	if (isSimulation) return newStateRand(state);
-	//[1]
-	if (state.kidNum == -1) {
-		state.kidNum =  0;
-		for (int i = 0; i < state.board.size(); i++)
-			if (state.board[i] * -state.player > 0) {
-				int t = getNextStep(state.board, i);
-				state.kidNum += t;
-				state.kidList.push_back(t);
-			}
-	}
-	if (state.kidNum - state.kidIndex.size() == 0) return false;
-	//[2]
-	int index = rand() % (state.kidNum - state.kidIndex.size()) + 1, 
-		cur   = 0;
-	std::sort(state.kidIndex.begin(), state.kidIndex.end());
-	for (int i = 0; i < state.kidIndex.size(); i++)
-		if (state.kidIndex[i] == index)index++;
-	state.kidIndex.push_back(index);
 
-	for (int i = 0; i < state.board.size(); i++)
-		if (state.board[i] * -state.player > 0) {
-			if  (index <= state.kidList[cur]) {
-				newState.st = i;
-				newState.ed = getNextStep(state.board, i, index);
-				break;
-			}
-			else index -= state.kidList[cur++];
-		}
-	newState.board			= state.board;
-	newState.player			=-state.player;
-	newState.eat			= state[newState.ed];
-	newState[newState.ed]	= state[newState.st];
-	newState[newState.st]	= 0;
-	return true;
+    // Chess Piece
+    enum { KING = 1, QUEEN, BISHOP, ROOK, KNIGHT, PAWN };
+    typedef char Piece;
+
+    // step of x, y
+    static const int
+        x_step[] = { 1,-1, 0, 0, 1,-1, 1,-1 },
+        y_step[] = { 0, 0, 1,-1, 1, 1,-1,-1 };
+
+    // State
+    struct State {
+        short action = -1;
+        char  player = -1;
+
+        Mat<Piece> board{ BOARDSIZE , BOARDSIZE };
+        unordered_map<int, int> actionSet;
+
+        State* parent = NULL;
+
+        State() {
+            board.zero(BOARDSIZE, BOARDSIZE);
+        }
+
+        State& operator=(State& x) {
+            action = x.action;
+            player = x.player;
+            board = x.board;
+            parent = x.parent;
+            return *this;
+        }
+    };
+
+    inline void initBoard(Mat<Piece>& board) {
+        board = {
+            -ROOK,-KNIGHT,-BISHOP,-QUEEN,-KING,-BISHOP,-KNIGHT,-ROOK,
+            -PAWN,-PAWN,-PAWN,-PAWN,-PAWN,-PAWN,-PAWN,-PAWN,
+            0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,
+            0,0,0,0,0,0,0,0,
+            PAWN, PAWN, PAWN, PAWN, PAWN, PAWN, PAWN, PAWN,
+            ROOK, KNIGHT, BISHOP, QUEEN, KING, BISHOP, KNIGHT, ROOK
+        };
+    }
+
+    inline void createActionSet(State& s) {
+        s.actionSet.clear();
+
+        for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
+            if (s.board[i] * s.player > 0) {
+                int x = i / BOARDSIZE,
+                    y = i % BOARDSIZE,
+                    p = s.board[i];
+
+                switch (abs(p)) {
+                case KING: {
+                    for (int j = 0; j < 8; j++) {
+                        int xt = x + x_step[j],
+                            yt = y + y_step[j];
+
+                        if (xt < 0 || xt >= BOARDSIZE ||
+                            yt < 0 || yt >= BOARDSIZE ||
+                            s.board(xt, yt) * p > 0)
+                            continue;
+
+                        s.actionSet[i * 64 + xt * BOARDSIZE + yt] = 1;
+                    }
+
+                } break;
+                case QUEEN: case BISHOP: case ROOK: {
+                    int j_st = 0,
+                        j_ed = 8;
+
+                    if (abs(p) == BISHOP)
+                        j_st = 4;
+                    else if (abs(p) == ROOK)
+                        j_ed = 4;
+
+                    for (int j = j_st; j < j_ed; j++) {
+                        int t = 0;
+
+                        while (++t) {
+                            int xt = x + t * x_step[j],
+                                yt = y + t * y_step[j];
+
+                            if (xt < 0 || xt >= BOARDSIZE ||
+                                yt < 0 || yt >= BOARDSIZE ||
+                                s.board(xt, yt) * p > 0)
+                                break;
+
+                            if (s.board(xt, yt) * p < 0) {
+                                s.actionSet[i * 64 + xt * BOARDSIZE + yt] = 1;
+                                break;
+                            }
+
+                            s.actionSet[i * 64 + xt * BOARDSIZE + yt] = 1;
+                        }
+                    }
+                } break;
+                case KNIGHT: {
+                    for (int j = 4; j < 8; j++) {
+                        // (2, 1)
+                        int xt = x + x_step[j] * 2,
+                            yt = y + y_step[j] * 1;
+
+                        if (xt < 0 || xt >= BOARDSIZE ||
+                            yt < 0 || yt >= BOARDSIZE ||
+                            s.board(xt, yt) * p > 0)
+                            continue;
+
+                        s.actionSet[i * 64 + xt * BOARDSIZE + yt] = 1;
+
+                        // (1, 2)
+                        xt = x + x_step[j] * 1,
+                        yt = y + y_step[j] * 2;
+
+                        if (xt < 0 || xt >= BOARDSIZE ||
+                            yt < 0 || yt >= BOARDSIZE ||
+                            s.board(xt, yt) * p > 0)
+                            continue;
+
+                        s.actionSet[i * 64 + xt * BOARDSIZE + yt] = 1;
+                    }
+                } break;
+                case PAWN: {
+                    if (p > 0) {
+                        if (x == BOARDSIZE - 2) {
+                            s.actionSet[i * 64 + (x - 1) * BOARDSIZE + y] = 1;
+                            s.actionSet[i * 64 + (x - 2) * BOARDSIZE + y] = 1;
+
+                            if (s.board(x - 1, y - 1) * p < 0)
+                                s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (y - 1)] = 1;
+                            if (s.board(x - 1, y + 1) * p < 0)
+                                s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (y + 1)] = 1;
+                        }
+                        else if (x > 1) {
+                            s.actionSet[i * 64 + (x - 1) * BOARDSIZE + y] = 1;
+
+                            if(s.board(x - 1, y - 1) * p < 0)
+                                s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (y - 1)] = 1;
+                            if (s.board(x - 1, y + 1) * p < 0)
+                                s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (y + 1)] = 1;
+                        }
+                        else if (x == 1) {
+                            // Promotion
+                            s.actionSet[i * 64 + (x - 1) * BOARDSIZE + y] = 1;
+                        }
+                    }
+                    if (p < 0) {
+                        if (x == 1) {
+                            s.actionSet[i * 64 + (x + 1) * BOARDSIZE + y] = 1;
+                            s.actionSet[i * 64 + (x + 2) * BOARDSIZE + y] = 1;
+
+                            if (s.board(x + 1, y - 1) * p < 0)
+                                s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (y - 1)] = 1;
+                            if (s.board(x + 1, y + 1) * p < 0)
+                                s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (y + 1)] = 1;
+                        }
+                        else if (x < BOARDSIZE - 2) {
+                            s.actionSet[i * 64 + (x + 1) * BOARDSIZE + y] = 1;
+
+                            if (s.board(x + 1, y - 1) * p < 0)
+                                s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (y - 1)] = 1;
+                            if (s.board(x + 1, y + 1) * p < 0)
+                                s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (y + 1)] = 1;
+                        }
+                        else if (x == BOARDSIZE - 2) {
+                            // Promotion
+                            s.actionSet[i * 64 + (x + 1) * BOARDSIZE + y] = 1;
+                        }
+                    }
+                }  break;
+                }
+            }
+        }
+    }
+
+    // move chess
+    inline bool moveChess(State& s) {
+        int a = abs(s.action),
+            st = a / 64,
+            ed = a % 64;
+
+        if (s.actionSet.find(s.action) == s.actionSet.end())
+            return false;
+
+        if (s.action > 0) {
+            s.board[ed] = s.board[st];
+            s.board[st] = 0;
+        }
+        else {
+            if (abs(s.board[st]) == KING) {
+                //
+            }
+            if (abs(s.board[st]) == PAWN) {
+                //
+            }
+        }
+
+        s.player = -s.player;
+        createActionSet(s);
+
+        return true;
+    }
 }
-// ����Montecarlo[3. ģ��]
-bool newStateRand(State& state) {
-	//[1]
-	int num = 0;
-	std::vector<int> numList;
-	for (int i = 0; i < state.board.size(); i++)
-		if (state.board[i] * -state.player > 0) {
-			int t = getNextStep(state.board, i);
-			numList.push_back(t);
-			num += t;
-		}
-	if (num == 0) return false;
-	//[2]
-	int index = rand() % num + 1, cur = 0;
-	for (int i = 0; i < state.board.size(); i++)
-		if (state.board[i] * -state.player > 0) {
-			if (index <= numList[cur]) {
-				state.st = i;
-				state.ed = getNextStep(state.board, i, index);
-				break;
-			}
-			else index -= numList[cur++];
-		}
-	state.player    =-state.player;
-	state.eat		= state[state.ed];
-	state[state.ed] = state[state.st];
-	state[state.st] = 0;
-	return true;
-}
-/*--------------------------------[ �ж��Ƿ���� ]--------------------------------*/
-bool judgeOut(int x, int y) {
-	return (x >= 0 && x < BOARDSIZE
-		 && y >= 0 && y < BOARDSIZE) ? false : true;
-}
-/******************************************************************************
-*                   �������������
-******************************************************************************/
-/*--------------------------------[ �ж���Ӯ ]--------------------------------*/
-void boardInit(Mat<Piece>& board) {
-	Piece t[] = {
-		 Rook, Knight, Bishop, Queen, King, Bishop, Knight, Rook,
-		 Pawn, Pawn, Pawn, Pawn, Pawn, Pawn, Pawn, Pawn,
-		0,0,0,0,0,0,0,0,
-		0,0,0,0,0,0,0,0,
-		0,0,0,0,0,0,0,0,
-		0,0,0,0,0,0,0,0,
-		-Pawn,-Pawn,-Pawn,-Pawn,-Pawn,-Pawn,-Pawn,-Pawn,
-		-Rook,-Knight,-Bishop,-Queen,-King,-Bishop,-Knight,-Rook,
-	};
-	board.get(t);
-}
-/*--------------------------------[ �ж���Ӯ ]--------------------------------*/
-char judgeWin(State& state) {
-	bool flagB = 1, flagW = 1;
-	for (int i = 0; i < state.board.size(); i++) {
-		if (state[i] ==  King) flagW = 0;
-		if (state[i] == -King) flagB = 0;
-	}
-	return flagB ? BLACK : (flagW ? WHITE : 0);
-}
-/*--------------------------------[ ��һ��״̬���� ]--------------------------------*/
-int getNextStep(Mat<Piece>& board, int pos, int index) {
-	Piece piece = board[pos];
-	int x = board.i2x(pos),
-		y = board.i2y(pos);
-	static const int 
-		x_step[] = { 1,-1, 0, 0, 1,-1, 1,-1 },
-		y_step[] = { 0, 0, 1,-1, 1, 1,-1,-1 };
-	int NextStepNum = 0;
-	switch (abs(piece)) {
-	case King: {													// ��
-		for (int i = 0; i < 8; i++) {
-			int xt = x + x_step[i], 
-				yt = y + y_step[i];
-			if (judgeOut(xt, yt) || board(xt, yt) * piece > 0) continue;
-			NextStepNum++;
-			if (index-- == 1) return board.xy2i(xt, yt);
-		}
-	}break;
-	case Queen: {												// Ů��
-		for (int i = 0; i < 8; i++) {
-			int xt = x + x_step[i], 
-				yt = y + y_step[i];
-			while (!judgeOut(xt, yt) && board(xt, yt) * piece <= 0) {
-				NextStepNum++;
-				if (index-- == 1) return board.xy2i(xt, yt);
-				if (board(xt, yt) * piece < 0) break;
-				xt += x_step[i];
-				yt += y_step[i];
-			}
-		}
-	}break;
-	case Bishop: {												// ��
-		for (int i = 4; i < 8; i++) {
-			int xt = x + x_step[i], 
-				yt = y + y_step[i];
-			while (!judgeOut(xt, yt) && board(xt, yt) * piece <= 0) {
-				NextStepNum++;
-				if (index-- == 1) return board.xy2i(xt, yt);
-				if (board(xt, yt) * piece < 0) break;
-				xt += x_step[i];
-				yt += y_step[i];
-			}
-		}
-	}break;
-	case Knight: {												// ��
-		for (int i = 0; i < 8; i++) {
-			int xt = x + x_step[i % 4 + 4] * (i <= 4 ? 2 : 1),
-				yt = y + y_step[i % 4 + 4] * (i >  4 ? 2 : 1);
-			int xfoot = x + x_step[i % 4 + 4] * (i <= 4 ? 1 : 0),
-				yfoot = y + y_step[i % 4 + 4] * (i >  4 ? 1 : 0);
-			if (judgeOut(xt, yt) 
-				|| board(xt, yt) * piece > 0
-				|| board(xfoot, yfoot) != 0						//������
-			) continue;
-			NextStepNum++;
-			if (index-- == 1) return board.xy2i(xt, yt);
-		}
-	}break;
-	case Rook: {													// ��
-		for (int i = 0; i < 4; i++) {
-			int xt = x + x_step[i], 
-				yt = y + y_step[i];
-			while (!judgeOut(xt, yt) && board(xt, yt) * piece <= 0) {
-				NextStepNum++;
-				if (index-- == 1) return board.xy2i(xt, yt);
-				if (board(xt, yt) * piece < 0) break;
-				xt += x_step[i];
-				yt += y_step[i];
-			}
-		}
-	}break;
-	case Pawn: {													// ��
-		int t = piece > 0 ? 1 : -1;
-		if (!judgeOut(x + t, y) && board(x + t, y) * piece <= 0) {
-			NextStepNum++;
-			if (index-- == 1) return board.xy2i(x + t, y);
-		}
-		if (((piece > 0 && x == 1)
-		||   (piece < 0 && x == 6))
-		&& !judgeOut(x + 2 * t, y) && board(x + 2 * t, y)* piece <= 0) {
-			NextStepNum++;
-			if (index-- == 1) return board.xy2i(x + 2 * t, y);
-		}
-	}break;
-	}
-	return NextStepNum;
-}
-};
 #endif
