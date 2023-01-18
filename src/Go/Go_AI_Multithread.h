@@ -7,6 +7,8 @@
 #include <thread>
 #include "Go.h"
 
+#define BANPOINT 0x7FFF
+#define EYEPOINT 0x7FFC
 #define THREADNUM 20
 
 namespace GoAI { 
@@ -84,9 +86,9 @@ namespace GoAI {
 				fill(evaluate_result.begin(), evaluate_result.end(), 0);
 				
 				for (auto e = root->child.begin(); e != root->child.end(); e++) {
-					if (e->second == NULL)
+					if (e->second == NULL) {
 						continue;
-
+					}
 					evaluate_result[e->first] = ((double)e->second->value + e->second->visit) / 2.0 / e->second->visit;
 					evaluate_visit [e->first] = e->second->visit;
 				}
@@ -127,6 +129,50 @@ namespace GoAI {
 		}
 	}
 
+
+	/*
+	 *  禁入点、眼点标记, not allow suicide
+	 */
+	inline void judgeBanAndEye(Go::State& s, Go::Color player) {
+
+		for (int i = 0; i < BOARDNUM; i++) {
+			if (s.board[i] != 0) continue;
+
+			char isEye = 0x7F;
+			bool isBan = 1;
+
+			for (int j = 0; j < 4; j++) {
+				int xt = i % BOARDSIZE + Go::adj_x[j],
+					yt = i / BOARDSIZE + Go::adj_y[j],
+					vt = yt * BOARDSIZE + xt;
+
+				if (xt < 0 || xt >= BOARDSIZE ||
+					yt < 0 || yt >= BOARDSIZE)
+					continue;
+
+				//核心判断
+				if ((s.board[vt] == 0)) {
+					isEye = isBan = 0;
+					break;
+				}
+				if (isEye == 0x7F)
+					isEye = s.board[vt];
+
+				if (s.board[vt] != isEye || s.qi[s.mark[vt]] == 1)
+					isEye = 0; 	//同一色，且均非一气
+
+				if ((s.board[vt] == player && s.qi[s.mark[vt]] != 1) ||	//若是我，应只一气
+					(s.board[vt] != player && s.qi[s.mark[vt]] == 1)) 	//若是敌，应必不只一气
+					isBan = 0;
+			}
+
+			if (isEye != 0)
+				s.mark[i] = EYEPOINT * isEye;
+			if (isBan)
+				s.mark[i] = BANPOINT * player;
+		}
+	}
+
 	inline void ExpandSimulate(Node* nd, int id) {
 		// Expand
 		int n = nd->actionSet.size();
@@ -145,6 +191,8 @@ namespace GoAI {
 			Node* newNode = NULL;
 
 			if (Go::updateState(*s_)) {
+				judgeBanAndEye(*s_, -(*s_).player);
+
 				// Simulate
 				int reward = Simulate(*s_);
 
@@ -220,8 +268,10 @@ namespace GoAI {
 					}
 				}
 
-				if (Go::updateState(s))
+				if (Go::updateState(s)) {
+					judgeBanAndEye(s, -s.player);
 					break;
+				}
 				else {  
 					// if this action is invalid
 					num--;
@@ -237,6 +287,7 @@ namespace GoAI {
 			if (num == 0) {
 				s.action = PASS; 
 				Go::updateState(s); 
+				judgeBanAndEye(s, -s.player);
 			}
 		}
 		int reward = Go::computeReward(s);

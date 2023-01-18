@@ -315,29 +315,7 @@ void StoneClass::displayMark(Go::State& s) {
     }
 
     for (int i = 0; i < BOARDNUM; i++) {
-        if (abs(s.mark[i]) == BANPOINT && fg == 1) {
-            int x = i % BOARDSIZE,
-                y = i / BOARDSIZE;
-
-            labels[i]->setText(QString('x'));
-            labels[i]->setGeometry(
-                BoardClass::boardMargin + BoardClass::gridSize * (x - 0.36),
-                BoardClass::boardMargin + BoardClass::gridSize * (y - 0.36), 30, 30);
-            labels[i]->setStyleSheet("color:Blue");
-            labels[i]->show();
-        }
-        else if (abs(s.mark[i]) == EYEPOINT && fg == 1) {
-            int x = i % BOARDSIZE,
-                y = i / BOARDSIZE;
-
-            labels[i]->setText(QString('o'));
-            labels[i]->setGeometry(
-                BoardClass::boardMargin + BoardClass::gridSize * (x - 0.36),
-                BoardClass::boardMargin + BoardClass::gridSize * (y - 0.36), 30, 30);
-            labels[i]->setStyleSheet("color:Blue");
-            labels[i]->show();
-        }
-        else if (s.mark[i] >= 0 && fg == 1) {
+        if (s.mark[i] >= 0 && fg == 1) {
             int x = i % BOARDSIZE,
                 y = i / BOARDSIZE;
 

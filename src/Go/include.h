@@ -17,8 +17,6 @@ namespace Go {
 #define WHITE -1
 #define EMPTY  0
 #define PASS  -1
-#define BANPOINT 0x7FFF
-#define EYEPOINT 0x7FFC
 
 	const static int
 		adj_x[] = { 0, 0, 1,-1 },
