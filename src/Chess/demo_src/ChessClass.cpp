@@ -56,9 +56,15 @@ void ChessClass::mousePressEvent(QMouseEvent* e) {
             if (st != ed) {
                 for (auto e = state->actionSet.begin(); e != state->actionSet.end(); e++) {
                     if (abs(e->first) / 64 == st && abs(e->first) % 64 == ed) {
-                        state->action = e->first;
+                        {
+                            Chess::State* s_ = new Chess::State;
+                            *s_ = *state;
+                            s_->parent = state;
+                            state = s_;
 
-                        Chess::moveChess(*state);
+                            state->action = e->first;
+                            Chess::moveChess(*state);
+                        }
                         break;
                     }
                 }
@@ -84,7 +90,7 @@ void ChessClass::mousePressEvent(QMouseEvent* e) {
         if (ai_is_open) {
             //ChessAI::move_pos = x * BOARDSIZE + y;
         }
-    }/*
+    }
     else if (e->button() == Qt::RightButton) {
 
     }
@@ -99,7 +105,7 @@ void ChessClass::mousePressEvent(QMouseEvent* e) {
         printChess(state->board);
     }
     
-    // if win
+    /* // if win
     
     if (Chess::judgeWin(*state) == BLACK) {
         printWin(BLACK);
@@ -117,12 +123,9 @@ void ChessClass::mousePressEvent(QMouseEvent* e) {
  *  键盘相应
  */
 void ChessClass::keyPressEvent(QKeyEvent* event) {
-    /*
     switch (event->key())    {
-    case Qt::Key_A: openAI(); break;
-    case Qt::Key_S: aiEvaluate(); break;
-    case Qt::Key_D: aiEvaluate_visit(); break;
-    }*/
+    case Qt::Key_M: printOpponentControlPoint(*state); break;
+    }
 }
 
 void ChessClass::openAI() {  /*
@@ -316,3 +319,127 @@ bool ChessClass::printEd(Chess::State& s, int st) {
     return true;
 }
 
+/*
+ *  显示对方控制点
+ */
+
+void opponentControlPoint(Chess::State& s, Mat<int>& mark, int player);
+
+void ChessClass::printOpponentControlPoint(Chess::State& s) {
+    static int fg = 0;
+    static QLabel ** labels = new QLabel * [BOARDSIZE * BOARDSIZE];
+
+    if (fg == 0) {
+        QFont font("Arial", 80, 50);
+        for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
+            labels[i] = new QLabel(this);
+            labels[i]->setFont(font);
+            labels[i]->setStyleSheet("color:Yellow");
+            labels[i]->setAlignment(Qt::AlignCenter);
+            labels[i]->hide();
+        }
+        fg = 1;
+    }
+
+    if (fg == 1) {
+        Mat<int> mark;
+        opponentControlPoint(*state, mark, -s.player);
+
+        for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
+            if (mark[i] > 0) {
+                int x = i / BOARDSIZE,
+                    y = i % BOARDSIZE;
+
+                labels[i]->setText((QString)"×");
+                labels[i]->setGeometry(
+                    BoardClass::boardMargin + BoardClass::gridSize * (y + 0.1),
+                    BoardClass::boardMargin + BoardClass::gridSize * (x + 0.1), 50, 50);
+                labels[i]->show();
+            }
+        }
+    }
+    else {
+        for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
+            labels[i]->hide();
+        }
+    }
+    fg = -fg;
+}
+
+void opponentControlPoint(Chess::State& s, Mat<int>& mark, int player) {
+    mark.zero(BOARDSIZE, BOARDSIZE);
+
+    for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
+        if (s.board[i] * player > 0) {
+            int x = i / BOARDSIZE,
+                y = i % BOARDSIZE,
+                p = s.board[i];
+
+            switch (abs(p)) {
+            case Chess::KING: {
+                for (int j = 0; j < 8; j++) {
+                    int xt = x + Chess::x_step[j],
+                        yt = y + Chess::y_step[j];
+
+                    if (xt < 0 || xt >= BOARDSIZE ||
+                        yt < 0 || yt >= BOARDSIZE)
+                        continue;
+
+                    mark[xt * BOARDSIZE + yt] += 1;
+                }
+
+            } break;
+            case Chess::QUEEN: case Chess::BISHOP: case Chess::ROOK: {
+                int j_st = abs(p) == Chess::BISHOP ? 4 : 0,
+                    j_ed = abs(p) == Chess::ROOK ? 4 : 8;
+
+                for (int j = j_st; j < j_ed; j++) {
+                    int t = 0;
+
+                    while (++t) {
+                        int xt = x + t * Chess::x_step[j],
+                            yt = y + t * Chess::y_step[j];
+
+                        if (xt < 0 || xt >= BOARDSIZE ||
+                            yt < 0 || yt >= BOARDSIZE)
+                            break;
+
+                        if (s.board(xt, yt) != 0) {
+                            mark[xt * BOARDSIZE + yt] += 1;
+                            break;
+                        }
+
+                        mark[xt * BOARDSIZE + yt] += 1;
+                    }
+                }
+            } break;
+            case Chess::KNIGHT: {
+                for (int j = 4; j < 8; j++) {
+                    // (2, 1)
+                    int xt = x + Chess::x_step[j] * 2,
+                        yt = y + Chess::y_step[j] * 1;
+
+                    if (!(xt < 0 || xt >= BOARDSIZE ||
+                          yt < 0 || yt >= BOARDSIZE))
+                        mark[xt * BOARDSIZE + yt] += 1;
+
+                    // (1, 2)
+                    xt = x + Chess::x_step[j] * 1,
+                    yt = y + Chess::y_step[j] * 2;
+
+                    if (!(xt < 0 || xt >= BOARDSIZE ||
+                        yt < 0 || yt >= BOARDSIZE))
+                        mark[xt * BOARDSIZE + yt] += 1;
+                }
+            } break;
+            case Chess::PAWN: {
+                int x_ = x + (p > 0 ? -1 : +1);
+                if(y - 1 >= 0)
+                    mark[x_ * BOARDSIZE + (y - 1)] += 1;
+                if (y + 1 < BOARDSIZE)
+                    mark[x_ * BOARDSIZE + (y + 1)] += 1;
+            }  break;
+            }
+        }
+    }
+}

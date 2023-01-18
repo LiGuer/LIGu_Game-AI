@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include <thread>
-#include "C:/Users/29753/Desktop/Projects/Games/src/Go/Go.h"
+#include "Go.h"
 
 #define THREADNUM 20
 
@@ -47,7 +47,8 @@ namespace GoAI {
 
 		// generate action set randomly
 		void generateActionSet() {
-			for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++)
+			actionSet.push_back(PASS);
+			for (int i = 0; i < BOARDNUM; i++)
 				if (state->mark[i] == -1)
 					actionSet.push_back(i);
 		}
@@ -56,8 +57,8 @@ namespace GoAI {
 	inline mutex mutex_;
 	static int move_pos = -1;
 	static int evaluate_fg = 0;
-	static vector<double> evaluate_result{ BOARDSIZE * BOARDSIZE };
-	static vector<int> evaluate_visit{ BOARDSIZE * BOARDSIZE };
+	static vector<double> evaluate_result{ BOARDNUM };
+	static vector<int> evaluate_visit{ BOARDNUM };
 
 	Node* Select(Node* node, bool isExplore);
 	void ExpandSimulate(Node* nd, int id);
@@ -143,7 +144,7 @@ namespace GoAI {
 			// new Node 
 			Node* newNode = NULL;
 
-			if (Go::downStone(*s_)) {
+			if (Go::updateState(*s_)) {
 				// Simulate
 				int reward = Simulate(*s_);
 
@@ -185,12 +186,11 @@ namespace GoAI {
 	 */
 	inline int Simulate(Go::State& _s) {
 		Go::State s = _s;
-		int reward = 0;  
 
 		int oldSCur = 0;
 		vector<Go::State> oldS(7);
 
-		while ((reward = Go::judgeWin(s)) == 0) {
+		while (!Go::isTermination(s)) {
 			// save old states to help judge Jie
 			oldS[oldSCur] = s; 
 			oldSCur = (oldSCur + 1) % 7;
@@ -199,16 +199,18 @@ namespace GoAI {
 			s.parent = &oldS[(oldSCur - 1 + 7) % 7];
 
 			// count how many actions we can choose
-			int num = 0;
-			for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++)
+			int num = 0, 
+				randnum = rand();
+
+			for (int i = 0; i < BOARDNUM; i++)
 				if (s.mark[i] == -1)
 					num++; 
 
 			// randomly choose an action
 			while (num > 0) {
-				int index = rand() % num + 1;
-				
-				for (int i = 0; i < BOARDSIZE * BOARDSIZE; i++) {
+				int index = randnum % num + 1;
+
+				for (int i = 0; i < BOARDNUM; i++) {
 					if (s.mark[i] == -1)
 						index--;
 
@@ -218,7 +220,7 @@ namespace GoAI {
 					}
 				}
 
-				if (Go::downStone(s))
+				if (Go::updateState(s))
 					break;
 				else {  
 					// if this action is invalid
@@ -232,8 +234,12 @@ namespace GoAI {
 				}
 			} 
 
+			if (num == 0) {
+				s.action = PASS; 
+				Go::updateState(s); 
+			}
 		}
-
+		int reward = Go::computeReward(s);
 		return reward;
 	}
 	

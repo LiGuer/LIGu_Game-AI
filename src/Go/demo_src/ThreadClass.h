@@ -8,7 +8,7 @@
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QThread> 
-#include "Go_AI_Multithread.h"
+#include "../Go_AI_Multithread.h"
 
 class ThreadClass : public QObject {
 	Q_OBJECT

@@ -40,5 +40,6 @@ private:
     void printChess(Mat<Chess::Piece>& Board);
     void printWin(int win);
     bool printEd(Chess::State& s, int st);
+    void printOpponentControlPoint(Chess::State& s);
 };
 #endif

@@ -8,8 +8,9 @@
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QThread> 
+#include <QMessageBox>
 #include <stdio.h>
-#include "C:/Users/29753/Desktop/Projects/Games/src/Go/Go.h"
+#include "../Go.h"
 #include "BoardClass.h"
 #include "ThreadClass.h"
 
@@ -38,10 +39,10 @@ private:
     void aiEvaluate();
     void aiEvaluate_visit();
 
-    void printStone(Mat<Go::Stone>& Board);
-    void printWin(int win);
-    void printQi(Go::State& s);
-    void printMark(Go::State& s);
-    void printNumber(Go::State& s);
+    void displayStone(array<Go::Color, BOARDNUM>& Board);
+    void displayWin();
+    void displayQi(Go::State& s);
+    void displayMark(Go::State& s);
+    void displayNumber(Go::State& s);
 };
 #endif

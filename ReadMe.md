@@ -6,7 +6,7 @@
 * ![Image text](img/20201122182136.png)
 * Operate
   - Press mouse left button: move stone
-  - Press mouse middle button: move stone
+  - Press mouse middle button: return to the previous state
   - Press key A: open AI
   - Press key S: display AI evaluation results
   - Press key Q: display qi of each stone
@@ -19,3 +19,6 @@
 
 ## [Chess 象棋](Chess.md) 
 * ![Image text](img/Chess_20230112143922.png)
+* Operate
+  - Press mouse left button: move stone
+  - Press mouse middle button: return to the previous state

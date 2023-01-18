@@ -48,8 +48,18 @@ namespace Chess {
         State& operator=(State& x) {
             action = x.action;
             player = x.player;
+
             board = x.board;
+            actionSet = x.actionSet;
+
             parent = x.parent;
+
+            king_move_black = x.king_move_black;
+            king_move_white = x.king_move_white;
+            rook_move_black = x.rook_move_black;
+            rook_move_white = x.rook_move_white;
+            pawn_move_two = x.pawn_move_two;
+
             return *this;
         }
     };
@@ -149,9 +159,9 @@ namespace Chess {
 
                     if (s.board(x_, y) == 0)
                         s.actionSet[i * 64 + x_ * BOARDSIZE + y] = 1;
-                    if (s.board(x_, y - 1) * p < 0)
+                    if (y - 1 >= 0 && s.board(x_, y - 1) * p < 0)
                         s.actionSet[i * 64 + x_ * BOARDSIZE + (y - 1)] = 1;
-                    if (s.board(x_, y + 1) * p < 0)
+                    if (y + 1 < BOARDSIZE && s.board(x_, y + 1) * p < 0)
                         s.actionSet[i * 64 + x_ * BOARDSIZE + (y + 1)] = 1;
 
                     if (p > 0) {
@@ -166,9 +176,9 @@ namespace Chess {
                             // Promotion
                             if (s.board(x - 1, y) == 0)
                                 s.actionSet[i * 64 + (x - 1) * BOARDSIZE + y] = -1;
-                            if (s.board(x - 1, y - 1) * p < 0)
+                            if (y - 1 >= 0 && s.board(x - 1, y - 1) * p < 0)
                                 s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (y - 1)] = -1;
-                            if (s.board(x - 1, y + 1) * p < 0)
+                            if (y + 1 < BOARDSIZE && s.board(x - 1, y + 1) * p < 0)
                                 s.actionSet[i * 64 + (x - 1) * BOARDSIZE + (y + 1)] = -1;
                         }
                     }
@@ -184,9 +194,9 @@ namespace Chess {
                             // Promotion
                             if (s.board(x + 1, y) == 0)
                                 s.actionSet[i * 64 + (x + 1) * BOARDSIZE + y] = -1;
-                            if (s.board(x + 1, y - 1) * p < 0)
+                            if (y - 1 >= 0 && s.board(x + 1, y - 1) * p < 0)
                                 s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (y - 1)] = -1;
-                            if (s.board(x + 1, y + 1) * p < 0)
+                            if (y + 1 < BOARDSIZE && s.board(x + 1, y + 1) * p < 0)
                                 s.actionSet[i * 64 + (x + 1) * BOARDSIZE + (y + 1)] = -1;
                         }
                     }
