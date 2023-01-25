@@ -58,7 +58,12 @@
         ```A point P, not colored C, is said to reach C, if there is a path of (vertically or horizontally) adjacent points of P’s color from P to a point of color C.```
 
         $$\text{adj}(x, y) = \{(x+1, y), (x, y+1), (x-1, y), (x, y-1)\}  \tag{Adjacent}$$
-        $$\text{reach}(x, y) = \{c \ |\ c = \boldsymbol B(x', y'), (x', y') \in \text{adj}((x, y))  \tag{Reach}\}$$
+
+        - Stone Block
+          Stone Block is consisted of adjecent stones of the same color.
+
+        - Qi
+          Qi is a number of empty points that a stone block can reach.
             
     - $\mathcal S$ State 
       $$S = (\boldsymbol B) \tag{State Set}$$
